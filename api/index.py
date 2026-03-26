@@ -1,7 +1,6 @@
-from fastapi import FastAPI
+import sys
+import os
 
-app = FastAPI()
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-@app.get("/api/v1/health")
-def health():
-    return {"status": "ok"}
+from _main import app
