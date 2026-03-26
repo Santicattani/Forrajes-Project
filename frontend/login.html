@@ -47,7 +47,9 @@
   </main>
 
   <script>
-    const API = 'http://localhost:8000/api/v1'
+    const API = window.location.hostname === 'localhost'
+      ? 'http://localhost:8000/api/v1'
+      : `${window.location.origin}/api/v1`
 
     document.getElementById('form').addEventListener('submit', async (e) => {
       e.preventDefault()
