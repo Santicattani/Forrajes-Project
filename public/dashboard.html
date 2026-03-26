@@ -502,9 +502,7 @@
       }
 
       try {
-        const res = await fetch('https://api-cotizaciones.agrofy.com.ar/api/Prices/GetFarmPricesGordo', {
-          headers: { 'Referer': 'https://news.agrofy.com.ar/' }
-        })
+        const res = await fetch(`${API}/mercado/ganado`)
         _mercadosData = await res.json()
         localStorage.setItem('ganado_cache', JSON.stringify({ _ts: Date.now(), data: _mercadosData }))
         poblarSelectMercado()

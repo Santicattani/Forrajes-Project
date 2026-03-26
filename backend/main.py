@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 from app.database import engine, Base
 from app.models import user, campo  # noqa: registrar modelos
-from app.routers import auth, clima, campos
+from app.routers import auth, clima, campos, mercado
 
 load_dotenv()
 
@@ -27,6 +27,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(campos.router, prefix="/api/v1")
 app.include_router(clima.router, prefix="/api/v1")
+app.include_router(mercado.router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health")
