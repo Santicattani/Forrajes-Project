@@ -9,6 +9,8 @@ from _app.database import engine, Base
 
 load_dotenv()
 
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI()
 
 app.add_middleware(
@@ -22,4 +24,4 @@ app.add_middleware(
 @app.get("/api/v1/health")
 def health():
     db_url = os.getenv("DATABASE_URL", "NOT_SET")
-    return {"status": "ok", "step": "con_db_import", "db": db_url[:30]}
+    return {"status": "ok", "step": "con_create_all", "db": db_url[:30]}
