@@ -33,19 +33,10 @@ app.include_router(clima.router, prefix="/api/v1")
 
 @app.get("/api/v1/health")
 def health():
-    cwd = os.getcwd()
-    file_dir = os.path.dirname(os.path.abspath(__file__))
-    return {
-        "status": "ok",
-        "cwd": cwd,
-        "file_dir": file_dir,
-        "cwd_contents": os.listdir(cwd),
-    }
+    return {"status": "ok"}
 
 
 # Servir frontend estático — debe ir al final
-_public = os.path.join(os.getcwd(), "public")
-if not os.path.isdir(_public):
-    _public = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public")
+_public = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
 if os.path.isdir(_public):
     app.mount("/", StaticFiles(directory=_public, html=True), name="static")
