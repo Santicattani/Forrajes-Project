@@ -16,6 +16,12 @@
     .barra { height: 4px; border-radius: 2px; background: #262626; overflow: hidden; }
     .barra-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
     .campo-item.activo { background: rgba(74,124,89,0.12); border-color: #4a7c59; color: #e5e5e5; }
+    .tab-alfalfa.active-alfalfa { border-bottom-color: #4a7c59; color: #e5e5e5; }
+    .tabla-alfalfa { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+    .tabla-alfalfa th { text-align: left; color: #737373; padding: 6px 8px; border-bottom: 1px solid #262626; }
+    .tabla-alfalfa td { padding: 6px 8px; border-bottom: 1px solid #1a1a1a; color: #d4d4d4; }
+    .tabla-alfalfa tr:hover td { background: rgba(255,255,255,0.02); }
+    .td-precio { color: #4a7c59; font-weight: 600; }
   </style>
 </head>
 <body class="bg-neutral-950 text-neutral-100 min-h-screen font-mono flex flex-col">
@@ -106,6 +112,35 @@
               <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
               <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
               <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
+            </div>
+          </div>
+
+          <!-- Precios Alfalfa -->
+          <div class="border border-neutral-800 rounded p-6 md:col-span-3">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <p class="text-xs text-neutral-500 uppercase tracking-widest">Precios Alfalfa</p>
+                <span id="alfalfa-periodo" class="text-xs text-neutral-600"></span>
+              </div>
+              <span id="alfalfa-actualizado" class="text-xs text-neutral-600"></span>
+            </div>
+            <!-- Tabs -->
+            <div class="flex gap-1 border-b border-neutral-800 mb-4">
+              <button onclick="mostrarTabAlfalfa('cordoba')" id="tab-alfalfa-cordoba"
+                class="tab-alfalfa px-4 py-2 text-xs text-neutral-400 border-b-2 border-transparent transition hover:text-neutral-200 active-alfalfa">
+                Córdoba
+              </button>
+              <button onclick="mostrarTabAlfalfa('henificacion')" id="tab-alfalfa-henificacion"
+                class="tab-alfalfa px-4 py-2 text-xs text-neutral-400 border-b-2 border-transparent transition hover:text-neutral-200">
+                Henificación
+              </button>
+              <button onclick="mostrarTabAlfalfa('otras')" id="tab-alfalfa-otras"
+                class="tab-alfalfa px-4 py-2 text-xs text-neutral-400 border-b-2 border-transparent transition hover:text-neutral-200">
+                Otras Provincias
+              </button>
+            </div>
+            <div id="alfalfa-content">
+              <div class="animate-pulse h-32 bg-neutral-900 rounded"></div>
             </div>
           </div>
 
@@ -236,6 +271,7 @@
       cargarPronostico(campo.id)
       cargarDolares()
       cargarCanuelas()
+      cargarAlfalfa()
       const ubi = await obtenerUbicacion(campo.latitud, campo.longitud)
       if (ubi) {
         document.getElementById('campo-titulo').textContent = `${campo.nombre} — ${ubi}`
@@ -520,6 +556,91 @@
       const defaultMercado = _mercadosData.find(m => m.Mercado?.toLowerCase().includes('ñuelas'))
       if (defaultMercado) select.value = defaultMercado.Mercado
       renderMercado(select.value)
+    }
+
+    // ── Precios Alfalfa ───────────────────────────────────
+    let _alfalfaData = null
+    let _tabAlfalfa  = 'cordoba'
+
+    function mostrarTabAlfalfa(tab) {
+      _tabAlfalfa = tab
+      document.querySelectorAll('.tab-alfalfa').forEach(b => b.classList.remove('active-alfalfa'))
+      document.getElementById(`tab-alfalfa-${tab}`).classList.add('active-alfalfa')
+      if (_alfalfaData) renderAlfalfa()
+    }
+
+    function renderAlfalfa() {
+      const d = _alfalfaData
+      const periodo = d.cordoba_heno[0]?.fecha || ''
+      document.getElementById('alfalfa-periodo').textContent = periodo
+
+      let html = ''
+      if (_tabAlfalfa === 'cordoba') {
+        const item = d.cordoba_heno[0]
+        html = `<table class="tabla-alfalfa">
+          <thead><tr><th>Formato</th><th>Calidad</th><th>Rango $/kg</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="2">Fardos</td><td>1° Calidad</td><td class="td-precio">${item.fardos_1era}</td></tr>
+            <tr><td>2° Calidad</td><td class="td-precio">${item.fardos_2da}</td></tr>
+            <tr><td rowspan="2">Rollos</td><td>1° Calidad</td><td class="td-precio">${item.rollos_1era}</td></tr>
+            <tr><td>2° Calidad</td><td class="td-precio">${item.rollos_2da}</td></tr>
+            <tr><td rowspan="2">Megafardos</td><td>1° Calidad</td><td class="td-precio">${item.megafardos_1era}</td></tr>
+            <tr><td>2° Calidad</td><td class="td-precio">${item.megafardos_2da}</td></tr>
+          </tbody>
+        </table>`
+      } else if (_tabAlfalfa === 'henificacion') {
+        const item = d.henificacion[0]
+        html = `<table class="tabla-alfalfa">
+          <thead><tr><th>Labor</th><th>Unidad</th><th>Rango Precio</th></tr></thead>
+          <tbody>
+            <tr><td>Segado</td><td>$/ha</td><td class="td-precio">${item.segado}</td></tr>
+            <tr><td>Rastrillado</td><td>$/ha</td><td class="td-precio">${item.rastrillado}</td></tr>
+            <tr><td rowspan="3">Confección</td><td>Fardos ($/u)</td><td class="td-precio">${item.confeccion_fardos}</td></tr>
+            <tr><td>Rollos ($/u)</td><td class="td-precio">${item.confeccion_rollos}</td></tr>
+            <tr><td>Megafardos ($/u)</td><td class="td-precio">${item.confeccion_megafardos}</td></tr>
+            <tr><td rowspan="2">Recolección/estiva</td><td>Fardos ($/u-mov)</td><td class="td-precio">${item.recoleccion_estiva_fardos}</td></tr>
+            <tr><td>Rollo-Mega ($/u-mov)</td><td class="td-precio">${item.recoleccion_estiva_rollo_mega}</td></tr>
+          </tbody>
+        </table>`
+      } else {
+        const item = d.otras_provincias[0]
+        html = `<table class="tabla-alfalfa">
+          <thead><tr><th>Formato</th><th>Calidad</th><th>Sgo.Estero</th><th>La Pampa</th><th>San Luis</th><th>Santa Fe</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="2">Fardos</td><td>1°</td><td class="td-precio">${item.fardos_1era_SE}</td><td class="td-precio">${item.fardos_1era_LP}</td><td class="td-precio">${item.fardos_1era_SL}</td><td class="td-precio">${item.fardos_1era_SF}</td></tr>
+            <tr><td>2°</td><td class="td-precio">${item.fardos_2da_SE}</td><td class="td-precio">${item.fardos_2da_LP}</td><td class="td-precio">${item.fardos_2da_SL}</td><td class="td-precio">${item.fardos_2da_SF}</td></tr>
+            <tr><td rowspan="2">Rollos</td><td>1°</td><td class="td-precio">${item.rollos_1era_SE}</td><td class="td-precio">${item.rollos_1era_LP}</td><td class="td-precio">${item.rollos_1era_SL}</td><td class="td-precio">${item.rollos_1era_SF}</td></tr>
+            <tr><td>2°</td><td class="td-precio">${item.rollos_2da_SE}</td><td class="td-precio">${item.rollos_2da_LP}</td><td class="td-precio">${item.rollos_2da_SL}</td><td class="td-precio">${item.rollos_2da_SF}</td></tr>
+            <tr><td rowspan="2">Megafardos</td><td>1°</td><td class="td-precio">${item.megafardos_1era_SE}</td><td class="td-precio">${item.megafardos_1era_LP}</td><td class="td-precio">${item.megafardos_1era_SL}</td><td class="td-precio">${item.megafardos_1era_SF}</td></tr>
+            <tr><td>2°</td><td class="td-precio">${item.megafardos_2da_SE}</td><td class="td-precio">${item.megafardos_2da_LP}</td><td class="td-precio">${item.megafardos_2da_SL}</td><td class="td-precio">${item.megafardos_2da_SF}</td></tr>
+          </tbody>
+        </table>`
+      }
+      document.getElementById('alfalfa-content').innerHTML = html
+    }
+
+    async function cargarAlfalfa() {
+      const cache = JSON.parse(localStorage.getItem('alfalfa_cache') || '{}')
+      if (cache._ts && (Date.now() - cache._ts) < TTL_MS && cache.data) {
+        _alfalfaData = cache.data
+        renderAlfalfa()
+        const d = new Date(cache._ts)
+        document.getElementById('alfalfa-actualizado').textContent =
+          `Actualizado ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} (caché)`
+        return
+      }
+      try {
+        const res = await fetch(`${API}/alfalfa/precios`)
+        _alfalfaData = await res.json()
+        localStorage.setItem('alfalfa_cache', JSON.stringify({ _ts: Date.now(), data: _alfalfaData }))
+        renderAlfalfa()
+        const ahora = new Date()
+        document.getElementById('alfalfa-actualizado').textContent =
+          `Actualizado ${ahora.getHours()}:${String(ahora.getMinutes()).padStart(2,'0')}`
+      } catch {
+        document.getElementById('alfalfa-content').innerHTML =
+          '<p class="text-neutral-500 text-sm">No se pudieron cargar los precios.</p>'
+      }
     }
 
     document.getElementById('logout').addEventListener('click', () => {
