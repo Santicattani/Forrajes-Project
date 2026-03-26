@@ -37,6 +37,8 @@ def health():
 
 
 # Servir frontend estático — debe ir al final
-_public = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public")
+_public = os.path.join(os.getcwd(), "public")
+if not os.path.isdir(_public):
+    _public = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public")
 if os.path.isdir(_public):
     app.mount("/", StaticFiles(directory=_public, html=True), name="static")
