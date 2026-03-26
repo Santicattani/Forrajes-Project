@@ -2,9 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from app.database import engine, Base
-from app.models import user, campo  # noqa: registrar modelos
-from app.routers import auth, clima, campos
+from _app.database import engine, Base
+from _app.models import user, campo  # noqa: registrar modelos
+from _app.routers import auth, clima, campos
 
 load_dotenv()
 

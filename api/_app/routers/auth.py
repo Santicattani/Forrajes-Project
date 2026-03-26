@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from jose import jwt
 from passlib.context import CryptContext
 
-from app.database import get_db
-from app.models.user import User
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserResponse
+from _app.database import get_db
+from _app.models.user import User
+from _app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

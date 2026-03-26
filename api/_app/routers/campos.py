@@ -4,9 +4,9 @@ from pydantic import BaseModel
 from jose import jwt
 import os
 
-from app.database import get_db
-from app.models.user import User
-from app.models.campo import Campo
+from _app.database import get_db
+from _app.models.user import User
+from _app.models.campo import Campo
 
 router = APIRouter(prefix="/campos", tags=["campos"])
 
