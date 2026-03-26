@@ -33,7 +33,14 @@ app.include_router(clima.router, prefix="/api/v1")
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok"}
+    cwd = os.getcwd()
+    file_dir = os.path.dirname(os.path.abspath(__file__))
+    return {
+        "status": "ok",
+        "cwd": cwd,
+        "file_dir": file_dir,
+        "cwd_contents": os.listdir(cwd),
+    }
 
 
 # Servir frontend estático — debe ir al final
