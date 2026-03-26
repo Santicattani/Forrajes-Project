@@ -1,6 +1,11 @@
 {
   "version": 2,
   "outputDirectory": "frontend",
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "backend/**"
+    }
+  },
   "rewrites": [
     { "source": "/api/v1/:path*", "destination": "/api/index" }
   ]
