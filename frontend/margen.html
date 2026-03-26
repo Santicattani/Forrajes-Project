@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Margen Operativo — Forrajes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: { accent: '#4a7c59' } } } }</script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    input[type=number] { -moz-appearance: textfield; }
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .tab-labor.active { color: #e5e5e5; border-bottom-color: #4a7c59; }
+    .sec-nav-btn.active { background: rgba(74,124,89,0.15); color: #e5e5e5; border-color: #4a7c59; }
+    .inp { background:#171717; border:1px solid #404040; border-radius:4px; padding:4px 8px; width:100%; color:#e5e5e5; font-size:0.8rem; }
+    .inp:focus { outline:none; border-color:#4a7c59; }
+    .td-num { text-align:right; padding:6px 12px; font-variant-numeric: tabular-nums; }
+    .td-label { padding:6px 12px; color:#a3a3a3; font-size:0.8rem; }
+    .tr-total { background:rgba(74,124,89,0.1); font-weight:600; }
+    table { border-collapse:collapse; width:100%; }
+    th { padding:8px 12px; text-align:right; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.05em; color:#737373; font-weight:400; }
+    th:first-child { text-align:left; }
+    tr { border-bottom:1px solid #262626; }
+    tr:last-child { border-bottom:none; }
+  </style>
+</head>
+<body class="bg-neutral-950 text-neutral-100 min-h-screen font-mono text-sm">
+
+<!-- HEADER -->
+<header class="border-b border-neutral-800 px-6 py-4 flex items-center justify-between sticky top-0 bg-neutral-950 z-50">
+  <div class="flex items-center gap-4">
+    <a href="dashboard.html" class="text-neutral-500 hover:text-neutral-300 text-xs transition">← Dashboard</a>
+    <span class="text-neutral-700">|</span>
+    <span class="text-accent font-semibold tracking-widest uppercase text-xs">Forrajes</span>
+    <span class="text-neutral-700">|</span>
+    <span class="text-neutral-300 text-xs">Margen Operativo — Heno de Alfalfa</span>
+    <span id="header-campo-nombre" class="hidden text-neutral-500 text-xs">| <span id="header-campo-label"></span></span>
+  </div>
+  <div class="flex items-center gap-2">
+    <button onclick="abrirModalSims()" id="btn-sims" class="text-xs text-neutral-300 border border-neutral-600 px-3 py-1.5 rounded hover:border-accent hover:text-accent transition">
+      Simulaciones <span id="badge-sims-count" class="hidden ml-1 text-accent"></span>
+    </button>
+    <button onclick="resetearDefaults()" class="text-xs text-neutral-500 border border-neutral-700 px-3 py-1.5 rounded hover:border-neutral-500 hover:text-neutral-300 transition">
+      Restaurar defaults
+    </button>
+  </div>
+</header>
+
+<!-- MODAL SIMULACIONES -->
+<div id="modal-sims" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+  <div class="bg-neutral-900 border border-neutral-700 rounded-lg w-full max-w-lg mx-4 max-h-[80vh] flex flex-col">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-neutral-800">
+      <div>
+        <h3 class="text-sm font-semibold text-neutral-100">Simulaciones</h3>
+        <p id="sims-campo-label" class="text-xs text-neutral-500 mt-0.5"></p>
+      </div>
+      <button onclick="cerrarModalSims()" class="text-neutral-500 hover:text-neutral-300 text-xl leading-none">×</button>
+    </div>
+
+    <!-- Guardar nueva -->
+    <div class="px-6 py-4 border-b border-neutral-800">
+      <p class="text-xs text-neutral-500 uppercase tracking-widest mb-3">Guardar estado actual</p>
+      <div class="flex gap-2">
+        <input id="inp-sim-nombre" type="text" placeholder="Nombre de la simulación..."
+          class="flex-1 bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-xs text-neutral-100 placeholder-neutral-600 focus:outline-none focus:border-accent"
+          onkeydown="if(event.key==='Enter') guardarSimulacion()">
+        <button onclick="guardarSimulacion()" class="bg-accent hover:opacity-80 transition text-white text-xs px-4 py-2 rounded whitespace-nowrap">
+          Guardar
+        </button>
+      </div>
+      <p id="sims-error" class="text-xs text-red-400 mt-2 hidden"></p>
+    </div>
+
+    <!-- Lista -->
+    <div class="flex-1 overflow-y-auto px-6 py-4">
+      <p class="text-xs text-neutral-500 uppercase tracking-widest mb-3">Simulaciones guardadas</p>
+      <div id="lista-sims"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION NAV -->
+<nav class="border-b border-neutral-800 px-6 flex gap-1 overflow-x-auto">
+  <button onclick="mostrarSeccion(0)" id="snav-0" class="sec-nav-btn border border-transparent px-4 py-3 text-xs text-neutral-500 rounded-t transition whitespace-nowrap active">0. Bienvenida</button>
+  <button onclick="mostrarSeccion(1)" id="snav-1" class="sec-nav-btn border border-transparent px-4 py-3 text-xs text-neutral-500 rounded-t transition whitespace-nowrap">1. Datos Generales</button>
+  <button onclick="mostrarSeccion(2)" id="snav-2" class="sec-nav-btn border border-transparent px-4 py-3 text-xs text-neutral-500 rounded-t transition whitespace-nowrap">2. Maquinaria</button>
+  <button onclick="mostrarSeccion(3)" id="snav-3" class="sec-nav-btn border border-transparent px-4 py-3 text-xs text-neutral-500 rounded-t transition whitespace-nowrap">3. Labores</button>
+  <button onclick="mostrarSeccion(4)" id="snav-4" class="sec-nav-btn border border-transparent px-4 py-3 text-xs text-neutral-500 rounded-t transition whitespace-nowrap">4. Resultados</button>
+  <button onclick="mostrarSeccion(5)" id="snav-5" class="sec-nav-btn border border-transparent px-4 py-3 text-xs text-neutral-500 rounded-t transition whitespace-nowrap">5. Nutricional</button>
+</nav>
+
+<main class="max-w-6xl mx-auto px-6 py-8">
+
+<!-- ══════════════════════════════════════════════════════
+     SECCIÓN 0 — BIENVENIDA
+══════════════════════════════════════════════════════ -->
+<section id="sec-0">
+  <div class="max-w-2xl mx-auto py-8">
+    <p class="text-accent text-xs uppercase tracking-widest mb-3">Calculadora de costos</p>
+    <h1 class="text-3xl font-semibold text-neutral-50 mb-4">Margen operativo<br>Heno de Alfalfa en Rollos</h1>
+    <p class="text-neutral-400 leading-relaxed mb-8">
+      Esta herramienta calcula el costo operativo de producción de heno de alfalfa en rollos con red,
+      desglosado por labor (corte, hilerado, confección y transporte).
+    </p>
+
+    <div class="border border-yellow-800 bg-yellow-900/10 rounded p-4 mb-8">
+      <p class="text-yellow-400 text-xs font-semibold uppercase tracking-widest mb-2">⚠ Importante</p>
+      <p class="text-yellow-200/70 text-xs leading-relaxed">
+        Esta herramienta <strong>no almacena ningún dato</strong>. Todos los valores que aparecen al abrir la app
+        son <strong>ejemplos de referencia</strong> basados en parámetros típicos — no representan datos reales de ningún campo.
+        Reemplazalos con los datos de tu propio campo y maquinaria antes de interpretar cualquier resultado.
+      </p>
+    </div>
+
+    <p class="text-neutral-400 text-xs uppercase tracking-widest mb-4">Datos que necesitás tener a mano</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-10">
+      <div class="border border-neutral-800 rounded p-4">
+        <p class="text-accent text-xs font-semibold mb-2">Campo y producción</p>
+        <ul class="text-neutral-400 text-xs space-y-1">
+          <li>· Superficie (has) y número de cortes</li>
+          <li>· Rendimiento por corte (Kg MV/ha)</li>
+          <li>· Contenido de materia seca (%)</li>
+          <li>· Peso del fardo (Kg MV)</li>
+        </ul>
+      </div>
+      <div class="border border-neutral-800 rounded p-4">
+        <p class="text-accent text-xs font-semibold mb-2">Maquinaria (por cada equipo)</p>
+        <ul class="text-neutral-400 text-xs space-y-1">
+          <li>· Valor de mercado actual</li>
+          <li>· Vida útil estimada y tasa de depreciación</li>
+          <li>· Coeficiente de reparaciones y mantenimiento</li>
+          <li>· Consumo de combustible (l/h)</li>
+        </ul>
+      </div>
+      <div class="border border-neutral-800 rounded p-4">
+        <p class="text-accent text-xs font-semibold mb-2">Precios actuales</p>
+        <ul class="text-neutral-400 text-xs space-y-1">
+          <li>· Precio del gas oil ($/litro)</li>
+          <li>· Sueldo operarios ($/mes)</li>
+          <li>· Precio hilo/red ($/bobina)</li>
+          <li>· Tipo de cambio ($/USD)</li>
+        </ul>
+      </div>
+      <div class="border border-neutral-800 rounded p-4">
+        <p class="text-accent text-xs font-semibold mb-2">Pastura y datos opcionales</p>
+        <ul class="text-neutral-400 text-xs space-y-1">
+          <li>· Costos de implantación y mantenimiento</li>
+          <li>· Análisis de laboratorio: FDA, FDN, PB (%)</li>
+          <li>· Precio de referencia contratista</li>
+        </ul>
+      </div>
+    </div>
+
+    <button onclick="mostrarSeccion(1)" class="bg-accent hover:opacity-80 transition text-white px-8 py-3 rounded text-sm">
+      Comenzar →
+    </button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SECCIÓN 1 — DATOS GENERALES
+══════════════════════════════════════════════════════ -->
+<section id="sec-1" class="hidden">
+  <div class="mb-6">
+    <p class="text-xs text-neutral-500 uppercase tracking-widest mb-1">Sección 1</p>
+    <h2 class="text-xl font-semibold text-neutral-50">Datos Generales</h2>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    <!-- Campo y Producción -->
+    <div class="border border-neutral-800 rounded p-5">
+      <p class="text-xs text-accent uppercase tracking-widest mb-4">Campo y Producción</p>
+      <div class="space-y-3" id="form-campo"></div>
+    </div>
+
+    <!-- Parámetros Económicos -->
+    <div class="border border-neutral-800 rounded p-5">
+      <div class="flex items-center justify-between mb-4">
+        <p class="text-xs text-accent uppercase tracking-widest">Parámetros Económicos</p>
+        <span id="badge-ccl" class="text-xs text-neutral-600">cargando CCL...</span>
+      </div>
+      <div class="space-y-3" id="form-eco"></div>
+    </div>
+
+    <!-- Datos Operativos -->
+    <div class="border border-neutral-800 rounded p-5">
+      <p class="text-xs text-accent uppercase tracking-widest mb-4">Datos Operativos por Labor</p>
+      <div class="space-y-3" id="form-operativo"></div>
+    </div>
+
+    <!-- Pastura -->
+    <div class="border border-neutral-800 rounded p-5">
+      <p class="text-xs text-accent uppercase tracking-widest mb-4">Costos de Pastura de Alfalfa</p>
+      <p class="text-xs text-neutral-500 mb-3">Amortizados en 4 años</p>
+      <div class="space-y-3" id="form-pastura"></div>
+      <div class="mt-4 pt-4 border-t border-neutral-800">
+        <div class="flex justify-between text-xs">
+          <span class="text-neutral-500">Total pastura (USD/ha/año)</span>
+          <span id="calc-pastura-total-usd" class="text-neutral-200">—</span>
+        </div>
+        <div class="flex justify-between text-xs mt-1">
+          <span class="text-neutral-500">Total pastura ($/ha/año)</span>
+          <span id="calc-pastura-total-ars" class="text-accent">—</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Resumen calculado -->
+  <div class="mt-6 border border-neutral-800 rounded p-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div>
+      <p class="text-xs text-neutral-500 mb-1">Sup. total trabajada</p>
+      <p id="calc-sup-total" class="text-lg font-semibold text-neutral-100">—</p>
+    </div>
+    <div>
+      <p class="text-xs text-neutral-500 mb-1">Rendimiento final (KgMS/ha)</p>
+      <p id="calc-rend-final" class="text-lg font-semibold text-neutral-100">—</p>
+    </div>
+    <div>
+      <p class="text-xs text-neutral-500 mb-1">Rollos/ha</p>
+      <p id="calc-rollos-ha" class="text-lg font-semibold text-accent">—</p>
+    </div>
+    <div>
+      <p class="text-xs text-neutral-500 mb-1">Rollos totales/campaña</p>
+      <p id="calc-rollos-total" class="text-lg font-semibold text-neutral-100">—</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SECCIÓN 2 — MAQUINARIA
+══════════════════════════════════════════════════════ -->
+<section id="sec-2" class="hidden">
+  <div class="mb-6">
+    <p class="text-xs text-neutral-500 uppercase tracking-widest mb-1">Sección 2</p>
+    <h2 class="text-xl font-semibold text-neutral-50">Maquinaria</h2>
+  </div>
+  <div id="grilla-maquinaria" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SECCIÓN 3 — LABORES
+══════════════════════════════════════════════════════ -->
+<section id="sec-3" class="hidden">
+  <div class="mb-6">
+    <p class="text-xs text-neutral-500 uppercase tracking-widest mb-1">Sección 3</p>
+    <h2 class="text-xl font-semibold text-neutral-50">Labores</h2>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-0 border-b border-neutral-800 mb-6">
+    <button onclick="mostrarLabor('corte')"      id="tab-corte"      class="tab-labor border-b-2 border-transparent px-5 py-3 text-xs text-neutral-500 hover:text-neutral-300 transition active">Corte</button>
+    <button onclick="mostrarLabor('hilerado')"   id="tab-hilerado"   class="tab-labor border-b-2 border-transparent px-5 py-3 text-xs text-neutral-500 hover:text-neutral-300 transition">Hilerado</button>
+    <button onclick="mostrarLabor('confeccion')" id="tab-confeccion" class="tab-labor border-b-2 border-transparent px-5 py-3 text-xs text-neutral-500 hover:text-neutral-300 transition">Confección</button>
+    <button onclick="mostrarLabor('transporte')" id="tab-transporte" class="tab-labor border-b-2 border-transparent px-5 py-3 text-xs text-neutral-500 hover:text-neutral-300 transition">Transporte</button>
+  </div>
+
+  <div id="labor-corte">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="border border-neutral-800 rounded p-4 md:col-span-2" id="tabla-costos-corte"></div>
+      <div class="border border-neutral-800 rounded p-4 flex flex-col">
+        <p class="text-xs text-neutral-500 uppercase tracking-widest mb-3">Resumen</p>
+        <div id="resumen-corte" class="space-y-2 flex-1"></div>
+        <div class="mt-4"><canvas id="chart-corte" height="200"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="labor-hilerado" class="hidden">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="border border-neutral-800 rounded p-4 md:col-span-2" id="tabla-costos-hilerado"></div>
+      <div class="border border-neutral-800 rounded p-4 flex flex-col">
+        <p class="text-xs text-neutral-500 uppercase tracking-widest mb-3">Resumen</p>
+        <div id="resumen-hilerado" class="space-y-2 flex-1"></div>
+        <div class="mt-4"><canvas id="chart-hilerado" height="200"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="labor-confeccion" class="hidden">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="border border-neutral-800 rounded p-4 md:col-span-2" id="tabla-costos-confeccion"></div>
+      <div class="border border-neutral-800 rounded p-4 flex flex-col">
+        <p class="text-xs text-neutral-500 uppercase tracking-widest mb-3">Resumen</p>
+        <div id="resumen-confeccion" class="space-y-2 flex-1"></div>
+        <div class="mt-4"><canvas id="chart-confeccion" height="200"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="labor-transporte" class="hidden">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="border border-neutral-800 rounded p-4 md:col-span-2" id="tabla-costos-transporte"></div>
+      <div class="border border-neutral-800 rounded p-4 flex flex-col">
+        <p class="text-xs text-neutral-500 uppercase tracking-widest mb-3">Resumen</p>
+        <div id="resumen-transporte" class="space-y-2 flex-1"></div>
+        <div class="mt-4"><canvas id="chart-transporte" height="200"></canvas></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SECCIÓN 4 — RESULTADOS ECONÓMICOS
+══════════════════════════════════════════════════════ -->
+<section id="sec-4" class="hidden">
+  <div class="mb-6">
+    <p class="text-xs text-neutral-500 uppercase tracking-widest mb-1">Sección 4</p>
+    <h2 class="text-xl font-semibold text-neutral-50">Resultados Económicos</h2>
+  </div>
+
+  <!-- Tabla resumen labores -->
+  <div class="border border-neutral-800 rounded p-5 mb-6">
+    <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Resumen por Labor</p>
+    <div id="tabla-resumen-labores" class="overflow-x-auto"></div>
+  </div>
+
+  <!-- Costo total -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div class="border border-neutral-800 rounded p-5">
+      <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Costo Total de Producción</p>
+      <div id="tabla-costo-total"></div>
+    </div>
+    <div class="border border-neutral-800 rounded p-5">
+      <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Análisis de Margen</p>
+      <div class="mb-3">
+        <label class="text-xs text-neutral-500 block mb-1">Precio de venta (USD/rollo)</label>
+        <input type="number" id="inp-precio-venta" class="inp" style="width:140px" min="0" oninput="syncStateGuardando('eco','precioVentaUSD',this.value);recalcular()">
+      </div>
+      <div id="tabla-margen"></div>
+    </div>
+  </div>
+
+  <!-- Comparación contratista + producción anual -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div class="border border-neutral-800 rounded p-5">
+      <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">vs. Contratista</p>
+      <div id="tabla-contratista"></div>
+    </div>
+    <div class="border border-neutral-800 rounded p-5">
+      <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Producción Anual</p>
+      <div id="tabla-produccion-anual"></div>
+    </div>
+  </div>
+
+  <!-- Gráfico composición de costos -->
+  <div class="border border-neutral-800 rounded p-5">
+    <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Composición del Costo Total por Rubro</p>
+    <div class="max-w-lg mx-auto"><canvas id="chart-composicion" height="300"></canvas></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════
+     SECCIÓN 5 — NUTRICIONAL Y EQUIVALENCIAS
+══════════════════════════════════════════════════════ -->
+<section id="sec-5" class="hidden">
+  <div class="mb-6">
+    <p class="text-xs text-neutral-500 uppercase tracking-widest mb-1">Sección 5</p>
+    <h2 class="text-xl font-semibold text-neutral-50">Datos Nutricionales y Equivalencias</h2>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="border border-neutral-800 rounded p-5">
+      <p class="text-xs text-accent uppercase tracking-widest mb-4">Análisis de Laboratorio</p>
+      <div class="space-y-3" id="form-nutricional"></div>
+    </div>
+    <div class="border border-neutral-800 rounded p-5 md:col-span-2">
+      <p class="text-xs text-accent uppercase tracking-widest mb-4">Calidad y Consumo Animal</p>
+      <div id="tabla-calidad"></div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <div class="border border-neutral-800 rounded p-5">
+      <p class="text-xs text-accent uppercase tracking-widest mb-4">Costo del Kg de Proteína Bruta</p>
+      <p class="text-xs text-neutral-500 mb-3">Según % de PB (12% a 22%)</p>
+      <div id="tabla-costo-pb"></div>
+    </div>
+    <div class="border border-neutral-800 rounded p-5">
+      <p class="text-xs text-accent uppercase tracking-widest mb-4">Pastoreo Directo vs Henificado</p>
+      <div id="tabla-comparacion-pastoreo"></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+// ══════════════════════════════════════════════════════
+// DEFAULTS & STATE
+// ══════════════════════════════════════════════════════
+const DEFAULTS = {
+  campo: {
+    superficie: 300,
+    cortes: 6,
+    rendimientoKgMV: 11000,
+    contenidoMS: 17,
+    anchoCorteM: 3.8,
+    velCorte: 10,
+    eficCorte: 80,
+    pesoPardoKgMV: 480,
+    anchoHileradoM: 7.6,
+    velHilerado: 7,
+    eficHilerado: 80,
+    velConfeccion: 8,
+    eficConfeccion: 75,
+    tiempoAtadoS: 55,
+    capTransporte: 30,
+    tiempoCargaMin: 40,
+    tiempoDescargaMin: 30,
+    distanciaM: 3000,
+    velTransporte: 8,
+  },
+  eco: {
+    tasaRetorno: 30,
+    precioGasoil: 1.85,
+    precioBobina: 320,
+    rollosPorBobina: 210,
+    sueldoMensual: 800000,
+    horasMes: 200,
+    tipoCambio: 1250,
+    precioContratistaUSD: 37,
+    gasoilContratista: 20,
+    precioNovilloKg: 4,
+    perdidaSuministro: 28,
+    eficPastoreo: 53,
+    implantacionUSD: 118.5,
+    mantenimientoUSD: 50,
+    precioVentaUSD: 90,
+  },
+  maq: [
+    { nombre:'Tractor corte (130 CV)',       tipo:'tractor',     labor:'corte',      valor:130000, vidaUtil:10, tasaDeprec:6,   coefRM:0.000075, consumo:12, uso:50 },
+    { nombre:'Segadora (4m)',                tipo:'implemento',  labor:'corte',      valor:93000,  vidaUtil:6,  tasaDeprec:12,  coefRM:0.000223, consumo:0,  uso:100 },
+    { nombre:'Tractor hilerado (80 HP)',     tipo:'tractor',     labor:'hilerado',   valor:80000,  vidaUtil:10, tasaDeprec:6,   coefRM:0.000075, consumo:8,  uso:50 },
+    { nombre:'Rastrillo (2 hileras)',        tipo:'implemento',  labor:'hilerado',   valor:61000,  vidaUtil:5,  tasaDeprec:8,   coefRM:0.00018,  consumo:0,  uso:100 },
+    { nombre:'Tractor confección (130 CV)', tipo:'tractor',     labor:'confeccion', valor:130000, vidaUtil:10, tasaDeprec:8,   coefRM:0.000075, consumo:12, uso:50 },
+    { nombre:'Rotoenfardadora (1.2×1.8m)',  tipo:'implemento',  labor:'confeccion', valor:104000, vidaUtil:6,  tasaDeprec:10,  coefRM:0.000315, consumo:0,  uso:100 },
+    { nombre:'Tractor transporte (60 HP)',  tipo:'tractor',     labor:'transporte', valor:80000,  vidaUtil:10, tasaDeprec:5,   coefRM:0.000075, consumo:8,  uso:50 },
+    { nombre:'Transportador (30 fardos)',   tipo:'implemento',  labor:'transporte', valor:45000,  vidaUtil:7,  tasaDeprec:8.5, coefRM:0.00018,  consumo:0,  uso:100 },
+  ],
+  nut: { fda: 40, fdn: 50, pb: 18, pesoAnimal: 400 },
+};
+
+// Compute residual values from formula
+DEFAULTS.maq = DEFAULTS.maq.map(m => ({
+  ...m,
+  valorResidual: Math.max(0, m.valor * (1 - m.tasaDeprec / 100 * m.vidaUtil))
+}));
+
+let state = JSON.parse(JSON.stringify(DEFAULTS));
+let charts = {};
+
+// ══════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════
+function mostrarSeccion(n) {
+  for (let i = 0; i <= 5; i++) {
+    document.getElementById(`sec-${i}`).classList.toggle('hidden', i !== n);
+    document.getElementById(`snav-${i}`).classList.toggle('active', i === n);
+  }
+  if (n === 3) mostrarLabor(laborActiva);
+}
+
+let laborActiva = 'corte';
+function mostrarLabor(labor) {
+  laborActiva = labor;
+  ['corte','hilerado','confeccion','transporte'].forEach(l => {
+    document.getElementById(`labor-${l}`).classList.toggle('hidden', l !== labor);
+    document.getElementById(`tab-${l}`).classList.toggle('active', l === labor);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// FORMATTERS
+// ══════════════════════════════════════════════════════
+const f2 = n => isFinite(n) ? n.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
+const f0 = n => isFinite(n) ? n.toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:0}) : '—';
+
+// ══════════════════════════════════════════════════════
+// STATE SYNC
+// ══════════════════════════════════════════════════════
+function syncState(section, key, val) {
+  const v = parseFloat(val);
+  if (!isNaN(v) && v >= 0) state[section][key] = v;
+}
+function syncMaq(i, key, val) {
+  const v = parseFloat(val);
+  if (!isNaN(v) && v >= 0) state.maq[i][key] = v;
+}
+
+// ══════════════════════════════════════════════════════
+// BUILD FORMS
+// ══════════════════════════════════════════════════════
+function inputRow(label, unit, id, section, key, min=0) {
+  return `<div class="flex items-center justify-between gap-2">
+    <span class="text-neutral-400 text-xs flex-1">${label}</span>
+    <div class="flex items-center gap-1.5">
+      <input type="number" id="${id}" class="inp" style="width:100px" min="${min}" step="any"
+        value="${state[section][key]}"
+        oninput="syncStateGuardando('${section}','${key}',this.value);recalcular()">
+      <span class="text-neutral-600 text-xs w-20">${unit}</span>
+    </div>
+  </div>`;
+}
+
+function buildForms() {
+  document.getElementById('form-campo').innerHTML = [
+    inputRow('Superficie',          'has',        'inp-superficie',   'campo','superficie'),
+    inputRow('Cortes por campaña',  'cortes',     'inp-cortes',       'campo','cortes'),
+    inputRow('Rendimiento por corte','Kg MV/ha',  'inp-rendimiento',  'campo','rendimientoKgMV'),
+    inputRow('Contenido de MS',     '%',          'inp-cont-ms',      'campo','contenidoMS', 1),
+    inputRow('Ancho real de corte', 'm',          'inp-ancho-corte',  'campo','anchoCorteM', 0.1),
+    inputRow('Peso del fardo',      'Kg MV',      'inp-peso-fardo',   'campo','pesoPardoKgMV', 1),
+  ].join('');
+
+  document.getElementById('form-eco').innerHTML = [
+    inputRow('Tasa de retorno',     '% anual',    'inp-tasa-ret',     'eco','tasaRetorno', 1),
+    inputRow('Precio gas oil',      '$/litro',    'inp-gasoil',       'eco','precioGasoil', 0.01),
+    inputRow('Precio hilo/red',     '$/bobina',   'inp-bobina',       'eco','precioBobina', 1),
+    inputRow('Rollos por bobina',   'rollos',     'inp-rol-bob',      'eco','rollosPorBobina', 1),
+    inputRow('Sueldo mensual',      'ARS/mes',    'inp-sueldo-mes',   'eco','sueldoMensual', 1000),
+    inputRow('Horas trabajadas',    'hs/mes',     'inp-horas-mes',    'eco','horasMes', 1),
+    inputRow('Tipo de cambio',      '$/USD',      'inp-tc',           'eco','tipoCambio', 1),
+    inputRow('Precio contratista',  'USD/rollo',  'inp-contratista',  'eco','precioContratistaUSD', 1),
+    inputRow('Gas oil contratista', 'litros',     'inp-gasoil-cont',  'eco','gasoilContratista', 0),
+    inputRow('Precio Kg novillo',   '$/Kg',       'inp-novillo',      'eco','precioNovilloKg', 0.01),
+    inputRow('Pérdida suministro',  '%',          'inp-perd-sum',     'eco','perdidaSuministro', 0),
+    inputRow('Efic. pastoreo',      '%',          'inp-efic-past',    'eco','eficPastoreo', 1),
+  ].join('');
+
+  document.getElementById('form-operativo').innerHTML = [
+    '<p class="text-xs text-neutral-600 uppercase tracking-widest mt-1 mb-2">Corte</p>',
+    inputRow('Velocidad', 'km/h', 'inp-vel-corte', 'campo','velCorte', 1),
+    inputRow('Eficiencia', '%',   'inp-efic-corte','campo','eficCorte', 1),
+    '<p class="text-xs text-neutral-600 uppercase tracking-widest mt-3 mb-2">Hilerado</p>',
+    inputRow('Ancho de labor', 'm',    'inp-ancho-hil','campo','anchoHileradoM', 0.1),
+    inputRow('Velocidad',      'km/h', 'inp-vel-hil',  'campo','velHilerado', 1),
+    inputRow('Eficiencia',     '%',    'inp-efic-hil', 'campo','eficHilerado', 1),
+    '<p class="text-xs text-neutral-600 uppercase tracking-widest mt-3 mb-2">Confección</p>',
+    inputRow('Velocidad',           'km/h', 'inp-vel-conf',  'campo','velConfeccion', 1),
+    inputRow('Eficiencia',          '%',    'inp-efic-conf', 'campo','eficConfeccion', 1),
+    inputRow('Tiempo atado/expuls.','seg',  'inp-atado',     'campo','tiempoAtadoS', 1),
+    '<p class="text-xs text-neutral-600 uppercase tracking-widest mt-3 mb-2">Transporte</p>',
+    inputRow('Capacidad',        'fardos', 'inp-cap-transp',  'campo','capTransporte', 1),
+    inputRow('Tiempo de carga',  'min',    'inp-t-carga',     'campo','tiempoCargaMin', 1),
+    inputRow('Tiempo descarga',  'min',    'inp-t-descarga',  'campo','tiempoDescargaMin', 1),
+    inputRow('Distancia',        'm',      'inp-distancia',   'campo','distanciaM', 1),
+    inputRow('Velocidad',        'km/h',   'inp-vel-transp',  'campo','velTransporte', 1),
+  ].join('');
+
+  document.getElementById('form-pastura').innerHTML = [
+    inputRow('Implantación', 'USD/ha/año', 'inp-implant', 'eco','implantacionUSD', 0),
+    inputRow('Mantenimiento','USD/ha/año', 'inp-manten',  'eco','mantenimientoUSD', 0),
+  ].join('');
+
+  // Nutricional
+  document.getElementById('form-nutricional').innerHTML = [
+    inputRow('FDA',            '% sobre MS', 'inp-fda',        'nut','fda', 1),
+    inputRow('FDN',            '% sobre MS', 'inp-fdn',        'nut','fdn', 1),
+    inputRow('Proteína Bruta', '% sobre MS', 'inp-pb',         'nut','pb',  1),
+    inputRow('Peso animal',    'Kg',         'inp-peso-animal','nut','pesoAnimal', 1),
+  ].join('');
+
+  buildMaquinaria();
+}
+
+// ══════════════════════════════════════════════════════
+// BUILD MAQUINARIA CARDS
+// ══════════════════════════════════════════════════════
+function buildMaquinaria() {
+  const laborLabel = { corte:'Corte', hilerado:'Hilerado', confeccion:'Confección', transporte:'Transporte' };
+  document.getElementById('grilla-maquinaria').innerHTML = state.maq.map((m, i) => `
+    <div class="border border-neutral-800 rounded p-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-xs text-neutral-200 font-semibold">${m.nombre}</p>
+        <span class="text-xs px-2 py-0.5 rounded border ${m.tipo==='tractor' ? 'border-blue-800 text-blue-400' : 'border-neutral-700 text-neutral-400'}">${laborLabel[m.labor]}</span>
+      </div>
+      <div class="grid grid-cols-2 gap-x-4 gap-y-2 mb-3">
+        ${maqInput(i,'valor','Valor ($)',1)}
+        ${maqInput(i,'vidaUtil','Vida útil (años)',1)}
+        ${maqInput(i,'tasaDeprec','Tasa deprec. (%)',0.1)}
+        ${maqInput(i,'coefRM','Coef. R&M',0.000001)}
+        ${maqInput(i,'valorResidual','Valor residual ($)',0)}
+        ${maqInput(i,'consumo','Consumo (l/h)',0)}
+        ${maqInput(i,'uso','% uso anual',1)}
+      </div>
+      <div class="grid grid-cols-3 gap-2 pt-3 border-t border-neutral-800">
+        <div>
+          <p class="text-xs text-neutral-600 mb-0.5">Amort. ($/h)</p>
+          <p id="maq-amort-${i}" class="text-sm text-neutral-200 font-semibold">—</p>
+        </div>
+        <div>
+          <p class="text-xs text-neutral-600 mb-0.5">Costo de oportunidad ($/h)</p>
+          <p id="maq-interes-${i}" class="text-sm text-neutral-200 font-semibold">—</p>
+        </div>
+        <div>
+          <p class="text-xs text-neutral-600 mb-0.5">R&M ($/h)</p>
+          <p id="maq-rm-${i}" class="text-sm text-neutral-200 font-semibold">—</p>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function maqInput(i, key, label, step) {
+  return `<div>
+    <p class="text-xs text-neutral-600 mb-0.5">${label}</p>
+    <input type="number" class="inp" min="0" step="${step}" value="${state.maq[i][key]}"
+      oninput="syncMaqGuardando(${i},'${key}',this.value);recalcular()">
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// CALCULATION ENGINE
+// ══════════════════════════════════════════════════════
+function calcularTodo() {
+  const C = state.campo;
+  const E = state.eco;
+  const sup_total = C.superficie * C.cortes;
+
+  // Pérdidas y rendimiento final
+  const rend_kgMS_ha = C.rendimientoKgMV * (C.contenidoMS/100) * 0.93 * 0.93 * 0.92;
+  const rollos_ha = rend_kgMS_ha / (C.pesoPardoKgMV * C.contenidoMS/100);
+
+  // Capacidades operativas (has/h)
+  const cap_corte = C.anchoCorteM * C.velCorte * (C.eficCorte/100) / 10;
+  const cap_hilerado = C.anchoHileradoM * C.velHilerado * (C.eficHilerado/100) / 10;
+
+  // Confección
+  const kg_mv_por_m = C.rendimientoKgMV * C.anchoHileradoM / 10000;
+  const vel_conf_ms = C.velConfeccion * 1000 / 3600;
+  const t_avance_fardo = C.pesoPardoKgMV / (kg_mv_por_m * vel_conf_ms);
+  const t_ciclo_fardo = t_avance_fardo + C.tiempoAtadoS;
+  const rollos_h_conf = (C.eficConfeccion/100) * 3600 / t_ciclo_fardo;
+  const cap_confeccion = rollos_h_conf / rollos_ha;
+
+  // Transporte
+  const t_transp_min = C.distanciaM / (C.velTransporte * 1000/60);
+  const t_ciclo_transp = C.tiempoCargaMin + C.tiempoDescargaMin + t_transp_min;
+  const rollos_h_transp = 60 / t_ciclo_transp * C.capTransporte;
+  const cap_transporte = rollos_h_transp / rollos_ha;
+
+  // Horas/año por labor (= superficie_total / capacidad)
+  const horas = {
+    corte:      sup_total / cap_corte,
+    hilerado:   sup_total / cap_hilerado,
+    confeccion: sup_total / cap_confeccion,
+    transporte: sup_total / cap_transporte,
+  };
+  const caps = { corte: cap_corte, hilerado: cap_hilerado, confeccion: cap_confeccion, transporte: cap_transporte };
+
+  // Costos por hora por máquina
+  function costoMaquina(m, horasAnio) {
+    const amort   = (m.valor - m.valorResidual) * (m.tasaDeprec/100) * (m.uso/100) / horasAnio;
+    const interes = (m.valor + m.valorResidual) / 2 * (E.tasaRetorno/100) * (m.uso/100) / horasAnio;
+    const rm      = m.coefRM * m.valor;
+    const comb    = m.consumo * E.precioGasoil;
+    const mo      = E.horasMes > 0 ? E.sueldoMensual / E.horasMes : 0;
+    return { amort, interes, rm, comb, mo, total: amort + interes + rm + comb + mo };
+  }
+
+  const costos = state.maq.map((m,i) => costoMaquina(m, horas[m.labor]));
+
+  // Costos por labor ($/h = tractor + implemento)
+  function laborCostos(labor, conHiloRed = false) {
+    const idxTractor = state.maq.findIndex(m => m.labor === labor && m.tipo === 'tractor');
+    const idxImpl    = state.maq.findIndex(m => m.labor === labor && m.tipo === 'implemento');
+    const t = costos[idxTractor];
+    const im = costos[idxImpl];
+
+    // Por hora
+    const mo_h     = t.mo + im.mo; // MO se cuenta una vez por dupla (un operario)
+    // Actually un operario por máquina -> sum
+    const comb_h   = t.comb + im.comb;
+    const amort_h  = t.amort + im.amort;
+    const int_h    = t.interes + im.interes;
+    const rm_h     = t.rm + im.rm;
+    let hilo_h     = 0;
+    if (conHiloRed) {
+      const costo_hilo_rollo = E.precioBobina / E.rollosPorBobina;
+      hilo_h = costo_hilo_rollo * rollos_h_conf; // $/h de hilo
+    }
+    const total_h  = mo_h + comb_h + amort_h + int_h + rm_h + hilo_h;
+
+    const cap = caps[labor];
+    const ha_h = cap;
+
+    return {
+      tractor: t, implemento: im,
+      rubros: { mo: mo_h, comb: comb_h, amort: amort_h, interes: int_h, rm: rm_h, hilo: hilo_h },
+      h: total_h,
+      ha: total_h / ha_h,
+      fardo: total_h / ha_h / rollos_ha,
+      kgMS: total_h / ha_h / rend_kgMS_ha,
+      cap: ha_h,
+      horas: horas[labor],
+      idxTractor, idxImpl,
+    };
+  }
+
+  const L = {
+    corte:      laborCostos('corte'),
+    hilerado:   laborCostos('hilerado'),
+    confeccion: laborCostos('confeccion', true),
+    transporte: laborCostos('transporte'),
+  };
+
+  // Totales
+  const total_ha = L.corte.ha + L.hilerado.ha + L.confeccion.ha + L.transporte.ha;
+  const pastura_ha = (E.implantacionUSD + E.mantenimientoUSD) * E.tipoCambio;
+  const total_con_pastura_ha = total_ha + pastura_ha;
+
+  // Por rubro (suma de todas las labores)
+  const rubros_totales = ['mo','comb','amort','interes','rm','hilo'].reduce((acc, r) => {
+    acc[r] = (L.corte.rubros[r]||0)/L.corte.cap +
+             (L.hilerado.rubros[r]||0)/L.hilerado.cap +
+             (L.confeccion.rubros[r]||0)/L.confeccion.cap +
+             (L.transporte.rubros[r]||0)/L.transporte.cap;
+    return acc;
+  }, {});
+
+  // Pastura
+  const pastura_total_usd = E.implantacionUSD + E.mantenimientoUSD;
+  const pastura_total_ars = pastura_total_usd * E.tipoCambio;
+
+  // Nutricional
+  const N = state.nut;
+  const ddm = 88.9 - 0.779 * N.fda;
+  const dmi_pct = 120 / N.fdn;
+  const em = ddm * 0.04409 / 100;
+  const consumo_kgMS_dia = N.pesoAnimal * dmi_pct / 100;
+  const consumo_pb_dia = consumo_kgMS_dia * N.pb / 100;
+  const kgMS_rollo = C.pesoPardoKgMV * C.contenidoMS / 100;
+  const kg_pb_rollo = kgMS_rollo * N.pb / 100;
+  const costo_rollo_ars = total_con_pastura_ha / rollos_ha;
+  const costo_kgpb = costo_rollo_ars / kg_pb_rollo;
+  const rfv = (ddm * dmi_pct) / 1.29;
+
+  return {
+    sup_total, rend_kgMS_ha, rollos_ha, caps, horas,
+    costos, L, total_ha, pastura_ha, total_con_pastura_ha,
+    pastura_total_usd, pastura_total_ars, rubros_totales,
+    N, ddm, dmi_pct, em, consumo_kgMS_dia, consumo_pb_dia,
+    kgMS_rollo, kg_pb_rollo, costo_rollo_ars, costo_kgpb, rfv,
+    rollos_h_conf, t_ciclo_transp,
+  };
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════
+function recalcular() {
+  const R = calcularTodo();
+  renderSeccion1(R);
+  renderSeccion2(R);
+  renderSeccion3(R);
+  renderSeccion4(R);
+  renderSeccion5(R);
+}
+
+function renderSeccion1(R) {
+  const E = state.eco;
+  setText('calc-sup-total',    `${f0(R.sup_total)} has`);
+  setText('calc-rend-final',   f2(R.rend_kgMS_ha));
+  setText('calc-rollos-ha',    f2(R.rollos_ha));
+  setText('calc-rollos-total', f0(R.rollos_ha * R.sup_total));
+  setText('calc-pastura-total-usd', f2(R.pastura_total_usd));
+  setText('calc-pastura-total-ars', `$${f0(R.pastura_total_ars)}`);
+}
+
+function renderSeccion2(R) {
+  R.costos.forEach((c, i) => {
+    setText(`maq-amort-${i}`,   `$${f2(c.amort)}`);
+    setText(`maq-interes-${i}`, `$${f2(c.interes)}`);
+    setText(`maq-rm-${i}`,      `$${f2(c.rm)}`);
+  });
+}
+
+function renderSeccion3(R) {
+  ['corte','hilerado','confeccion','transporte'].forEach(labor => {
+    renderTablaLabor(labor, R);
+    renderResumenLabor(labor, R);
+    renderChartLabor(labor, R);
+  });
+}
+
+function renderTablaLabor(labor, R) {
+  const L = R.L[labor];
+  const laborNombre = {corte:'Corte',hilerado:'Hilerado',confeccion:'Confección',transporte:'Transporte'};
+  const E = state.eco;
+
+  const rows = [
+    { label: 'Mano de obra',    t: L.tractor.mo,      im: L.implemento.mo,      total: L.rubros.mo },
+    { label: 'Combustible',     t: L.tractor.comb,    im: 0,                    total: L.rubros.comb },
+    { label: 'Amortización',    t: L.tractor.amort,   im: L.implemento.amort,   total: L.rubros.amort },
+    { label: 'Costo de oport.', t: L.tractor.interes, im: L.implemento.interes, total: L.rubros.interes },
+    { label: 'R&M',             t: L.tractor.rm,      im: L.implemento.rm,      total: L.rubros.rm },
+  ];
+  if (labor === 'confeccion') rows.push({ label: 'Hilo/red', t: 0, im: 0, total: L.rubros.hilo });
+
+  const html = `
+    <p class="text-xs text-neutral-500 uppercase tracking-widest mb-3">${laborNombre[labor]}
+      — Cap. ${f2(L.cap)} has/h — ${f0(L.horas)} hs/campaña</p>
+    <table>
+      <thead><tr>
+        <th style="text-align:left">Rubro</th>
+        <th>Tractor ($/h)</th>
+        <th>Implemento ($/h)</th>
+        <th>Total ($/h)</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => `<tr>
+          <td class="td-label">${r.label}</td>
+          <td class="td-num text-neutral-300">${r.t > 0 ? f2(r.t) : '—'}</td>
+          <td class="td-num text-neutral-300">${r.im > 0 ? f2(r.im) : '—'}</td>
+          <td class="td-num text-neutral-200">${f2(r.total)}</td>
+        </tr>`).join('')}
+        <tr class="tr-total">
+          <td class="td-label">Total</td>
+          <td class="td-num">${f2(L.tractor.total)}</td>
+          <td class="td-num">${f2(L.implemento.total + (L.rubros.hilo || 0))}</td>
+          <td class="td-num text-accent">${f2(L.h)}</td>
+        </tr>
+      </tbody>
+    </table>`;
+  setText(`tabla-costos-${labor}`, html);
+}
+
+function renderResumenLabor(labor, R) {
+  const L = R.L[labor];
+  const html = `
+    <div class="flex justify-between text-xs py-1 border-b border-neutral-800">
+      <span class="text-neutral-500">$/hora</span>
+      <span class="text-neutral-200 font-semibold">$${f2(L.h)}</span>
+    </div>
+    <div class="flex justify-between text-xs py-1 border-b border-neutral-800">
+      <span class="text-neutral-500">$/ha</span>
+      <span class="text-neutral-200 font-semibold">$${f2(L.ha)}</span>
+    </div>
+    <div class="flex justify-between text-xs py-1 border-b border-neutral-800">
+      <span class="text-neutral-500">$/fardo</span>
+      <span class="text-accent font-semibold">$${f2(L.fardo)}</span>
+    </div>
+    <div class="flex justify-between text-xs py-1">
+      <span class="text-neutral-500">$/Kg MS</span>
+      <span class="text-neutral-200 font-semibold">$${f2(L.kgMS)}</span>
+    </div>`;
+  setText(`resumen-${labor}`, html);
+}
+
+function renderChartLabor(labor, R) {
+  const L = R.L[labor];
+  const rubros = L.rubros;
+  const cap = L.cap;
+  const data = [
+    rubros.mo / cap,
+    rubros.comb / cap,
+    rubros.amort / cap,
+    rubros.interes / cap,
+    rubros.rm / cap,
+    (rubros.hilo || 0) / cap,
+  ].filter(v => v > 0);
+  const labels = ['M. de obra','Combustible','Amortiz.','Costo oport.','R&M','Hilo/red'].filter((_, i) =>
+    [rubros.mo, rubros.comb, rubros.amort, rubros.interes, rubros.rm, rubros.hilo || 0][i] / cap > 0
+  );
+  const colors = ['#4a7c59','#e3a008','#3b82f6','#8b5cf6','#ef4444','#f97316'];
+  updatePieChart(`chart-${labor}`, labels, data, colors.slice(0, data.length));
+}
+
+function renderSeccion4(R) {
+  const E = state.eco;
+  const labores = ['corte','hilerado','confeccion','transporte'];
+  const nombres = { corte:'Corte', hilerado:'Hilerado', confeccion:'Confección', transporte:'Transporte' };
+
+  // Tabla resumen
+  document.getElementById('tabla-resumen-labores').innerHTML = `
+    <table>
+      <thead><tr>
+        <th style="text-align:left">Labor</th>
+        <th>$/hora</th><th>$/ha</th><th>$/fardo</th><th>$/Kg MS</th><th>Has/h</th><th>Hs/campaña</th>
+      </tr></thead>
+      <tbody>
+        ${labores.map(l => `<tr>
+          <td class="td-label">${nombres[l]}</td>
+          <td class="td-num">$${f2(R.L[l].h)}</td>
+          <td class="td-num">$${f2(R.L[l].ha)}</td>
+          <td class="td-num">$${f2(R.L[l].fardo)}</td>
+          <td class="td-num">$${f2(R.L[l].kgMS)}</td>
+          <td class="td-num">${f2(R.L[l].cap)}</td>
+          <td class="td-num">${f0(R.L[l].horas)}</td>
+        </tr>`).join('')}
+        <tr class="tr-total">
+          <td class="td-label">TOTAL</td>
+          <td class="td-num">—</td>
+          <td class="td-num text-accent">$${f2(R.total_ha)}</td>
+          <td class="td-num text-accent">$${f2(R.total_ha / R.rollos_ha)}</td>
+          <td class="td-num text-accent">$${f2(R.total_ha / R.rend_kgMS_ha)}</td>
+          <td class="td-num">—</td>
+          <td class="td-num">${f0(labores.reduce((s,l) => s + R.L[l].horas, 0))}</td>
+        </tr>
+      </tbody>
+    </table>`;
+
+  // Costo total
+  const total_fardo = R.total_ha / R.rollos_ha;
+  const total_kgMS  = R.total_ha / R.rend_kgMS_ha;
+  const con_past_fardo = R.total_con_pastura_ha / R.rollos_ha;
+  const con_past_kgMS  = R.total_con_pastura_ha / R.rend_kgMS_ha;
+  document.getElementById('tabla-costo-total').innerHTML = `
+    <table>
+      <thead><tr><th style="text-align:left">Concepto</th><th>$/ha</th><th>$/fardo</th><th>$/Kg MS</th></tr></thead>
+      <tbody>
+        <tr><td class="td-label">Sin pastura</td>
+          <td class="td-num">$${f2(R.total_ha)}</td>
+          <td class="td-num">$${f2(total_fardo)}</td>
+          <td class="td-num">$${f2(total_kgMS)}</td></tr>
+        <tr><td class="td-label text-xs">+ Pastura (${f2(R.pastura_total_usd)} USD/ha)</td>
+          <td class="td-num text-neutral-500">$${f2(R.pastura_ha)}</td><td class="td-num">—</td><td class="td-num">—</td></tr>
+        <tr class="tr-total"><td class="td-label">Con pastura</td>
+          <td class="td-num text-accent">$${f2(R.total_con_pastura_ha)}</td>
+          <td class="td-num text-accent">$${f2(con_past_fardo)}</td>
+          <td class="td-num text-accent">$${f2(con_past_kgMS)}</td></tr>
+      </tbody>
+    </table>`;
+
+  // Margen
+  const precio_venta_ars = E.precioVentaUSD * E.tipoCambio;
+  const margen_fardo = precio_venta_ars - con_past_fardo;
+  const margen_pct   = (margen_fardo / con_past_fardo) * 100;
+  const color = margen_fardo >= 0 ? 'text-green-400' : 'text-red-400';
+  document.getElementById('tabla-margen').innerHTML = `
+    <div class="space-y-2 text-xs">
+      <div class="flex justify-between py-1 border-b border-neutral-800">
+        <span class="text-neutral-500">Precio de venta ($/fardo)</span>
+        <span class="text-neutral-200">$${f2(precio_venta_ars)}</span>
+      </div>
+      <div class="flex justify-between py-1 border-b border-neutral-800">
+        <span class="text-neutral-500">Costo c/ pastura ($/fardo)</span>
+        <span class="text-neutral-200">$${f2(con_past_fardo)}</span>
+      </div>
+      <div class="flex justify-between py-1 border-b border-neutral-800">
+        <span class="text-neutral-500">Margen ($/fardo)</span>
+        <span class="${color} font-semibold">$${f2(margen_fardo)}</span>
+      </div>
+      <div class="flex justify-between py-1">
+        <span class="text-neutral-500">Margen (%)</span>
+        <span class="${color} font-semibold">${f2(margen_pct)}%</span>
+      </div>
+    </div>`;
+
+  // Comparación contratista
+  const costo_contratista = (E.precioContratistaUSD * E.tipoCambio) + (E.gasoilContratista * E.precioGasoil);
+  const ahorro_fardo = costo_contratista - con_past_fardo;
+  const rollos_total = R.rollos_ha * R.sup_total;
+  const ahorro_anual = ahorro_fardo * rollos_total;
+  const color_ah = ahorro_fardo >= 0 ? 'text-green-400' : 'text-red-400';
+  document.getElementById('tabla-contratista').innerHTML = `
+    <div class="space-y-2 text-xs">
+      <div class="flex justify-between py-1 border-b border-neutral-800">
+        <span class="text-neutral-500">Precio contratista ($/fardo)</span>
+        <span class="text-neutral-200">$${f2(costo_contratista)}</span>
+      </div>
+      <div class="flex justify-between py-1 border-b border-neutral-800">
+        <span class="text-neutral-500">Costo propio c/ pastura ($/fardo)</span>
+        <span class="text-neutral-200">$${f2(con_past_fardo)}</span>
+      </div>
+      <div class="flex justify-between py-1 border-b border-neutral-800">
+        <span class="text-neutral-500">Ahorro/fardo</span>
+        <span class="${color_ah} font-semibold">$${f2(ahorro_fardo)}</span>
+      </div>
+      <div class="flex justify-between py-1">
+        <span class="text-neutral-500">Ahorro anual (${f0(rollos_total)} rollos)</span>
+        <span class="${color_ah} font-semibold">$${f0(ahorro_anual)}</span>
+      </div>
+    </div>`;
+
+  // Producción anual
+  document.getElementById('tabla-produccion-anual').innerHTML = `
+    <div class="space-y-2 text-xs">
+      <div class="flex justify-between py-1 border-b border-neutral-800">
+        <span class="text-neutral-500">Rollos/ha/campaña</span>
+        <span class="text-neutral-200">${f2(R.rollos_ha * state.campo.cortes)}</span>
+      </div>
+      <div class="flex justify-between py-1 border-b border-neutral-800">
+        <span class="text-neutral-500">Rollos totales/campaña</span>
+        <span class="text-accent font-semibold">${f0(rollos_total)}</span>
+      </div>
+      <div class="flex justify-between py-1 border-b border-neutral-800">
+        <span class="text-neutral-500">Erogado sin pastura</span>
+        <span class="text-neutral-200">$${f0(R.total_ha * state.campo.superficie)}</span>
+      </div>
+      <div class="flex justify-between py-1">
+        <span class="text-neutral-500">Erogado con pastura</span>
+        <span class="text-neutral-200">$${f0(R.total_con_pastura_ha * state.campo.superficie)}</span>
+      </div>
+    </div>`;
+
+  // Gráfico composición
+  const rt = R.rubros_totales;
+  const vals = [rt.mo, rt.comb, rt.amort, rt.interes, rt.rm, rt.hilo].map(v => v || 0);
+  updateBarChart('chart-composicion',
+    ['M. de obra','Combustible','Amortizaciones','Costo de oport.','R&M','Hilo/red'],
+    vals,
+    ['#4a7c59','#e3a008','#3b82f6','#8b5cf6','#ef4444','#f97316']
+  );
+}
+
+function renderSeccion5(R) {
+  const E = state.eco;
+  const C = state.campo;
+  const N = state.nut;
+  const costo_rollo_sin_past = R.total_ha / R.rollos_ha;
+
+  document.getElementById('tabla-calidad').innerHTML = `
+    <table>
+      <thead><tr><th style="text-align:left">Indicador</th><th>Valor</th><th>Unidad</th></tr></thead>
+      <tbody>
+        <tr><td class="td-label">Digestibilidad (DDM)</td><td class="td-num text-neutral-200">${f2(R.ddm)}%</td><td class="td-num text-neutral-500">% MS</td></tr>
+        <tr><td class="td-label">Consumo voluntario (DMI)</td><td class="td-num text-neutral-200">${f2(R.dmi_pct)}%</td><td class="td-num text-neutral-500">% PV</td></tr>
+        <tr><td class="td-label">Valor Relativo del Forraje (RFV)</td><td class="td-num text-accent font-semibold">${f2(R.rfv)}</td><td class="td-num text-neutral-500">índice</td></tr>
+        <tr><td class="td-label">Energía Metab. estimada</td><td class="td-num text-neutral-200">${f2(R.em)}</td><td class="td-num text-neutral-500">Mcal/Kg MS</td></tr>
+        <tr><td class="td-label">Consumo esperado (${N.pesoAnimal} Kg PV)</td><td class="td-num text-neutral-200">${f2(R.consumo_kgMS_dia)}</td><td class="td-num text-neutral-500">Kg MS/día</td></tr>
+        <tr><td class="td-label">Consumo proteico/día</td><td class="td-num text-neutral-200">${f2(R.consumo_pb_dia)}</td><td class="td-num text-neutral-500">Kg PB/día</td></tr>
+        <tr><td class="td-label">Kg MS por rollo</td><td class="td-num text-neutral-200">${f2(R.kgMS_rollo)}</td><td class="td-num text-neutral-500">Kg MS</td></tr>
+        <tr><td class="td-label">Kg PB por rollo</td><td class="td-num text-accent">${f2(R.kg_pb_rollo)}</td><td class="td-num text-neutral-500">Kg PB</td></tr>
+        <tr><td class="td-label">Rollos/animal/año</td><td class="td-num text-neutral-200">${f2(R.consumo_kgMS_dia * 365 / R.kgMS_rollo)}</td><td class="td-num text-neutral-500">rollos</td></tr>
+      </tbody>
+    </table>`;
+
+  // Tabla costo PB por % de PB
+  const filas = [];
+  for (let pb = 12; pb <= 22; pb += 2) {
+    const kg_pb = R.kgMS_rollo * pb / 100;
+    const costo_kgpb = R.costo_rollo_ars / kg_pb;
+    filas.push(`<tr>
+      <td class="td-label">${pb}%</td>
+      <td class="td-num">${f2(kg_pb)} Kg</td>
+      <td class="td-num text-neutral-200">$${f0(costo_kgpb)}</td>
+      <td class="td-num ${pb == Math.round(N.pb) ? 'text-accent font-semibold' : 'text-neutral-500'}">
+        ${pb == Math.round(N.pb) ? '← actual' : ''}</td>
+    </tr>`);
+  }
+  document.getElementById('tabla-costo-pb').innerHTML = `
+    <table>
+      <thead><tr><th style="text-align:left">% PB</th><th>Kg PB/rollo</th><th>$/Kg PB</th><th></th></tr></thead>
+      <tbody>${filas.join('')}</tbody>
+    </table>`;
+
+  // Pastoreo vs Henificado
+  const rend_kgMS_anual = C.rendimientoKgMV * C.cortes * C.contenidoMS / 100;
+  const past_aprovechado = rend_kgMS_anual * E.eficPastoreo / 100;
+  const past_carne = past_aprovechado / 8; // 1 kg carne cada 8 kg MS
+  const past_renta = past_carne * E.precioNovilloKg;
+
+  const hen_rollos_ha = R.rollos_ha * C.cortes;
+  const hen_renta = hen_rollos_ha * E.precioVentaUSD * E.tipoCambio;
+  const hen_costo = R.total_con_pastura_ha;
+  const hen_margen = hen_renta - hen_costo;
+
+  document.getElementById('tabla-comparacion-pastoreo').innerHTML = `
+    <table>
+      <thead><tr><th style="text-align:left">Indicador</th><th>Pastoreo</th><th>Henificado</th></tr></thead>
+      <tbody>
+        <tr><td class="td-label">Forraje aprovechado (Kg MS/ha/año)</td>
+          <td class="td-num">${f0(past_aprovechado)}</td>
+          <td class="td-num">${f0(rend_kgMS_anual * 0.93 * 0.93 * 0.92 * (1-E.perdidaSuministro/100) * C.cortes)}</td></tr>
+        <tr><td class="td-label">Producción carne (Kg/ha/año)</td>
+          <td class="td-num">${f2(past_carne)}</td>
+          <td class="td-num">—</td></tr>
+        <tr><td class="td-label">Rollos/ha/año</td>
+          <td class="td-num">—</td>
+          <td class="td-num text-accent">${f2(hen_rollos_ha)}</td></tr>
+        <tr><td class="td-label">Renta estimada ($/ha/año)</td>
+          <td class="td-num">$${f0(past_renta)}</td>
+          <td class="td-num">$${f0(hen_renta)}</td></tr>
+        <tr><td class="td-label">Costo producción ($/ha/año)</td>
+          <td class="td-num">$${f0(0)}</td>
+          <td class="td-num">$${f0(hen_costo)}</td></tr>
+        <tr class="tr-total"><td class="td-label">Margen ($/ha/año)</td>
+          <td class="td-num text-green-400">$${f0(past_renta)}</td>
+          <td class="td-num ${hen_margen >= 0 ? 'text-green-400' : 'text-red-400'}">$${f0(hen_margen)}</td></tr>
+      </tbody>
+    </table>`;
+}
+
+// ══════════════════════════════════════════════════════
+// CHARTS
+// ══════════════════════════════════════════════════════
+function updatePieChart(id, labels, data, colors) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  if (charts[id]) { charts[id].destroy(); }
+  charts[id] = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors, borderWidth: 0 }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#737373', font: { size: 10 }, padding: 8, boxWidth: 10 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: $${f2(ctx.raw)}/ha (${f2(ctx.parsed * 100 / ctx.dataset.data.reduce((a,b)=>a+b,0))}%)` } }
+      }
+    }
+  });
+}
+
+function updateBarChart(id, labels, data, colors) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  if (charts[id]) { charts[id].destroy(); }
+  charts[id] = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors, borderWidth: 0, borderRadius: 4 }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` $${f2(ctx.raw)}/ha` } }
+      },
+      scales: {
+        x: { ticks: { color: '#737373', font: { size: 10 } }, grid: { color: '#262626' } },
+        y: { ticks: { color: '#737373', font: { size: 10 }, callback: v => `$${f0(v)}` }, grid: { color: '#262626' } }
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════
+function setText(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+function resetearDefaults() {
+  if (_storageKey) localStorage.removeItem(_storageKey);
+  state = JSON.parse(JSON.stringify(DEFAULTS));
+  buildForms();
+  document.getElementById('inp-precio-venta').value = state.eco.precioVentaUSD;
+  recalcular();
+}
+
+// ══════════════════════════════════════════════════════
+// PERSISTENCIA POR CAMPO
+// ══════════════════════════════════════════════════════
+const _params = new URLSearchParams(window.location.search);
+const _campoId = _params.get('campo_id');
+const _campoNombre = _params.get('nombre');
+const _storageKey = _campoId ? `margen_estado_campo_${_campoId}` : null;
+
+function guardarEstado() {
+  if (!_storageKey) return;
+  localStorage.setItem(_storageKey, JSON.stringify(state));
+}
+
+function cargarEstadoCampo() {
+  if (!_storageKey) return;
+  const saved = localStorage.getItem(_storageKey);
+  if (saved) {
+    try { state = JSON.parse(saved); } catch(e) {}
+  }
+}
+
+function syncStateGuardando(section, key, val) {
+  syncState(section, key, val);
+  guardarEstado();
+}
+
+function syncMaqGuardando(i, key, val) {
+  syncMaq(i, key, val);
+  guardarEstado();
+}
+
+// ══════════════════════════════════════════════════════
+// SIMULACIONES
+// ══════════════════════════════════════════════════════
+const _simsKey = _campoId ? `margen_sims_campo_${_campoId}` : null;
+
+function getSims() {
+  if (!_simsKey) return [];
+  try { return JSON.parse(localStorage.getItem(_simsKey) || '[]'); } catch(e) { return []; }
+}
+function saveSims(sims) {
+  if (!_simsKey) return;
+  localStorage.setItem(_simsKey, JSON.stringify(sims));
+}
+
+function abrirModalSims() {
+  document.getElementById('sims-campo-label').textContent =
+    _campoNombre ? `Campo: ${_campoNombre}` : 'Sin campo seleccionado — las simulaciones requieren acceder desde el dashboard';
+  document.getElementById('inp-sim-nombre').disabled = !_simsKey;
+  document.querySelector('#modal-sims button[onclick="guardarSimulacion()"]').disabled = !_simsKey;
+  renderListaSims();
+  document.getElementById('modal-sims').classList.remove('hidden');
+  if (_simsKey) setTimeout(() => document.getElementById('inp-sim-nombre').focus(), 50);
+}
+function cerrarModalSims() {
+  document.getElementById('modal-sims').classList.add('hidden');
+  document.getElementById('sims-error').classList.add('hidden');
+}
+
+function guardarSimulacion() {
+  if (!_simsKey) return;
+  const nombre = document.getElementById('inp-sim-nombre').value.trim();
+  const errEl = document.getElementById('sims-error');
+  if (!nombre) {
+    errEl.textContent = 'Ingresá un nombre para la simulación.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  errEl.classList.add('hidden');
+  const sims = getSims();
+  if (sims.find(s => s.nombre === nombre)) {
+    errEl.textContent = `Ya existe una simulación llamada "${nombre}". Usá otro nombre o eliminá la anterior.`;
+    errEl.classList.remove('hidden');
+    return;
+  }
+  sims.unshift({
+    id: Date.now(),
+    nombre,
+    fecha: new Date().toLocaleDateString('es-AR'),
+    state: JSON.parse(JSON.stringify(state)),
+  });
+  saveSims(sims);
+  document.getElementById('inp-sim-nombre').value = '';
+  renderListaSims();
+  actualizarBadgeSims();
+}
+
+function cargarSimulacion(id) {
+  const sims = getSims();
+  const sim = sims.find(s => s.id === id);
+  if (!sim) return;
+  if (!confirm(`¿Cargar la simulación "${sim.nombre}"? Se reemplazarán los valores actuales.`)) return;
+  state = JSON.parse(JSON.stringify(sim.state));
+  guardarEstado();
+  buildForms();
+  document.getElementById('inp-precio-venta').value = state.eco.precioVentaUSD;
+  recalcular();
+  cerrarModalSims();
+}
+
+function eliminarSimulacion(id) {
+  const sims = getSims();
+  const sim = sims.find(s => s.id === id);
+  if (!sim) return;
+  if (!confirm(`¿Eliminar la simulación "${sim.nombre}"?`)) return;
+  saveSims(sims.filter(s => s.id !== id));
+  renderListaSims();
+  actualizarBadgeSims();
+}
+
+function renderListaSims() {
+  const lista = document.getElementById('lista-sims');
+  const sims = getSims();
+  if (!sims.length) {
+    lista.innerHTML = '<p class="text-xs text-neutral-600 text-center py-4">No hay simulaciones guardadas.</p>';
+    return;
+  }
+  lista.innerHTML = sims.map(s => `
+    <div class="flex items-center justify-between gap-3 py-3 border-b border-neutral-800 last:border-0">
+      <div class="min-w-0">
+        <p class="text-sm text-neutral-200 truncate">${s.nombre}</p>
+        <p class="text-xs text-neutral-600">${s.fecha}</p>
+      </div>
+      <div class="flex gap-2 shrink-0">
+        <button onclick="cargarSimulacion(${s.id})"
+          class="text-xs text-accent border border-accent/30 hover:border-accent px-3 py-1.5 rounded transition">
+          Cargar
+        </button>
+        <button onclick="eliminarSimulacion(${s.id})"
+          class="text-xs text-neutral-500 border border-neutral-700 hover:border-red-700 hover:text-red-400 px-3 py-1.5 rounded transition">
+          ✕
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function actualizarBadgeSims() {
+  const count = getSims().length;
+  const badge = document.getElementById('badge-sims-count');
+  if (count > 0) {
+    badge.textContent = count;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// TIPO DE CAMBIO CCL EN VIVO
+// ══════════════════════════════════════════════════════
+async function cargarCCL() {
+  try {
+    const res = await fetch('https://dolarapi.com/v1/dolares/contadoconliqui');
+    const d = await res.json();
+    const ccl = d.venta;
+    state.eco.tipoCambio = ccl;
+    const inp = document.getElementById('inp-tc');
+    if (inp) inp.value = ccl;
+    guardarEstado();
+    recalcular();
+    document.getElementById('badge-ccl').innerHTML =
+      `<span class="text-green-500">● CCL en vivo</span> <span class="text-neutral-500">$${ccl.toLocaleString('es-AR')}/USD</span>`;
+  } catch(e) {
+    document.getElementById('badge-ccl').textContent = 'CCL no disponible';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+if (_campoNombre) {
+  document.getElementById('header-campo-label').textContent = _campoNombre;
+  document.getElementById('header-campo-nombre').classList.remove('hidden');
+}
+cargarEstadoCampo();
+buildForms();
+document.getElementById('inp-precio-venta').value = state.eco.precioVentaUSD;
+recalcular();
+actualizarBadgeSims();
+cargarCCL();
+</script>
+</body>
+</html>

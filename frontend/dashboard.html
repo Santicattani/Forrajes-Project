@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Forrajes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: { accent: '#4a7c59' } } } }</script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    #mapa { height: 260px; }
+    .estado-ideal     { border-color: #4a7c59; background: rgba(74,124,89,0.06); }
+    .estado-aceptable { border-color: #7c6e2a; background: rgba(124,110,42,0.06); }
+    .estado-no_apto   { border-color: #7c3a3a; background: rgba(124,58,58,0.06); }
+    .barra { height: 4px; border-radius: 2px; background: #262626; overflow: hidden; }
+    .barra-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+    .campo-item.activo { background: rgba(74,124,89,0.12); border-color: #4a7c59; color: #e5e5e5; }
+  </style>
+</head>
+<body class="bg-neutral-950 text-neutral-100 min-h-screen font-mono flex flex-col">
+
+  <header class="border-b border-neutral-800 px-8 py-5 flex items-center justify-between">
+    <a href="dashboard.html" class="text-accent font-semibold tracking-widest uppercase text-sm">Forrajes</a>
+    <div class="flex items-center gap-6">
+      <span id="nombre-usuario" class="text-neutral-400 text-sm"></span>
+      <button id="logout" class="text-sm text-neutral-500 hover:text-neutral-100 transition">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <div class="flex flex-1">
+
+    <!-- Sidebar: mis campos -->
+    <aside class="w-56 border-r border-neutral-800 p-4 flex flex-col gap-2 shrink-0">
+      <p class="text-xs text-neutral-500 uppercase tracking-widest mb-2">Mis campos</p>
+      <div id="lista-campos" class="flex flex-col gap-1"></div>
+      <button id="btn-nuevo-campo"
+        class="mt-3 text-xs text-accent border border-accent rounded px-3 py-2 hover:bg-accent hover:text-white transition text-left">
+        + Agregar campo
+      </button>
+    </aside>
+
+    <!-- Contenido principal -->
+    <main class="flex-1 px-8 py-8 overflow-auto">
+
+      <!-- Estado vacío -->
+      <div id="estado-vacio" class="hidden text-center py-24">
+        <p class="text-neutral-500 text-sm mb-4">No tenés campos configurados todavía.</p>
+        <button onclick="document.getElementById('btn-nuevo-campo').click()"
+          class="bg-accent hover:opacity-80 transition text-white text-sm px-5 py-2.5 rounded">
+          Agregar tu primer campo
+        </button>
+      </div>
+
+      <!-- Vista de campo seleccionado -->
+      <div id="vista-campo" class="hidden">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <p class="text-xs text-neutral-500 uppercase tracking-widest">Campo</p>
+            <h1 id="campo-titulo" class="text-2xl font-semibold text-neutral-50 mt-1"></h1>
+          </div>
+          <button id="btn-eliminar-campo"
+            class="text-xs text-red-500 border border-red-900 px-3 py-1.5 rounded hover:bg-red-900/30 transition">
+            Eliminar campo
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+          <!-- Días de corte -->
+          <div class="border border-neutral-800 rounded p-6 md:col-span-2">
+            <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Días ideales de corte</p>
+            <div id="pronostico" class="grid grid-cols-5 gap-2">
+              <div class="col-span-5 flex gap-2">
+                <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
+                <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
+                <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
+                <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
+                <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Margen operativo -->
+          <div class="border border-neutral-800 rounded p-6">
+            <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Margen operativo</p>
+            <p class="text-neutral-400 text-xs leading-relaxed mb-4">Calculá costos por labor, compará con contratistas y analizá la rentabilidad de tu producción de heno.</p>
+            <a id="link-margen" href="#" onclick="abrirMargen(event)" class="inline-block bg-accent hover:opacity-80 transition text-white text-xs px-4 py-2 rounded">
+              Abrir calculadora →
+            </a>
+          </div>
+
+          <!-- Alertas de clima -->
+          <div class="border border-neutral-800 rounded p-6 md:col-span-3">
+            <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Alertas de clima</p>
+            <div id="alertas"><p class="text-neutral-500 text-sm">Cargando...</p></div>
+          </div>
+
+          <!-- Cotización del dólar -->
+          <div class="border border-neutral-800 rounded p-6 md:col-span-3">
+            <div class="flex items-center justify-between mb-4">
+              <p class="text-xs text-neutral-500 uppercase tracking-widest">Cotización del dólar</p>
+              <span id="dolar-actualizado" class="text-xs text-neutral-600"></span>
+            </div>
+            <div id="dolar-cards" class="grid grid-cols-3 gap-4">
+              <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
+              <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
+              <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
+            </div>
+          </div>
+
+          <!-- Mercado de Cañuelas -->
+          <div class="border border-neutral-800 rounded p-6 md:col-span-3">
+            <div class="flex items-center justify-between mb-4">
+              <p class="text-xs text-neutral-500 uppercase tracking-widest">Mercado ganadero</p>
+              <div class="flex items-center gap-3">
+                <span id="canuelas-actualizado" class="text-xs text-neutral-600"></span>
+                <select id="select-mercado" onchange="renderMercado(this.value)"
+                  class="bg-neutral-900 border border-neutral-700 text-neutral-300 text-xs rounded px-2 py-1 focus:outline-none focus:border-accent">
+                </select>
+              </div>
+            </div>
+            <div id="canuelas-cards" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
+              <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
+              <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
+              <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Modal: nuevo campo -->
+      <div id="modal-nuevo-campo" class="hidden border border-neutral-800 rounded p-6 bg-neutral-900 max-w-xl">
+        <p class="text-sm font-semibold text-neutral-200 mb-4">Nuevo campo</p>
+        <p class="text-sm text-neutral-400 mb-4">Buscá o hacé click en el mapa para marcar la ubicación.</p>
+        <div class="flex gap-2 mb-4">
+          <input id="buscar-lugar" type="text" placeholder="Ej: Río Cuarto, Córdoba"
+            class="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent" />
+          <button id="btn-buscar" class="bg-neutral-700 hover:bg-neutral-600 text-sm px-4 py-2 rounded transition">Buscar</button>
+        </div>
+        <div id="mapa" class="rounded mb-4"></div>
+        <div class="flex gap-3 items-center">
+          <input id="campo-nombre-input" type="text" placeholder="Nombre del campo (ej: La Esperanza)"
+            class="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent" />
+          <button id="btn-guardar-campo" class="bg-accent hover:opacity-80 transition text-white text-sm px-5 py-2 rounded">
+            Guardar
+          </button>
+          <button id="btn-cancelar-campo" class="text-neutral-400 hover:text-neutral-100 text-sm px-3 py-2 transition">
+            Cancelar
+          </button>
+        </div>
+        <p id="coord-label" class="text-xs text-neutral-500 mt-2"></p>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    const API = 'http://localhost:8000/api/v1'
+    const token = localStorage.getItem('token')
+    if (!token) window.location.href = 'login.html'
+
+    let campos = []
+    let campoActivo = null
+    let marcador = null
+    let latLng = null
+    let mapa = null
+
+    const DIAS_ES  = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+    const MESES_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+    const COLORES  = {
+      ideal:     { texto: 'text-green-400',  label: 'Ideal' },
+      aceptable: { texto: 'text-yellow-400', label: 'Aceptable' },
+      no_apto:   { texto: 'text-red-400',    label: 'No apto' },
+    }
+    const BARRA_LLUVIA = p => p < 20 ? '#4a7c59' : p < 40 ? '#a07c2a' : '#9b3030'
+    const BARRA_HUM    = h => h < 65 ? '#4a7c59' : h < 75 ? '#a07c2a' : '#9b3030'
+
+    // ── Init ──────────────────────────────────────────────
+    fetch(`${API}/auth/me?token=${token}`)
+      .then(r => { if (!r.ok) throw new Error(); return r.json() })
+      .then(user => {
+        document.getElementById('nombre-usuario').textContent = user.nombre
+        cargarCampos()
+      })
+      .catch(() => window.location.href = 'login.html')
+
+    async function cargarCampos() {
+      const r = await fetch(`${API}/campos?token=${token}`)
+      campos = await r.json()
+      renderSidebar()
+      if (campos.length) seleccionarCampo(campos[0])
+      else mostrarVacio()
+    }
+
+    function renderSidebar() {
+      document.getElementById('lista-campos').innerHTML = campos.map(c => `
+        <button onclick="seleccionarCampo(${JSON.stringify(c).replace(/"/g, '&quot;')})"
+          class="campo-item text-left text-sm border border-neutral-800 rounded px-3 py-2 text-neutral-400 hover:text-neutral-100 hover:border-neutral-600 transition ${campoActivo?.id === c.id ? 'activo' : ''}">
+          ${c.nombre}
+        </button>`
+      ).join('')
+    }
+
+    function mostrarVacio() {
+      document.getElementById('estado-vacio').classList.remove('hidden')
+      document.getElementById('vista-campo').classList.add('hidden')
+    }
+
+    async function obtenerUbicacion(lat, lon) {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`, {
+          headers: { 'Accept-Language': 'es' }
+        })
+        const d = await res.json()
+        const addr = d.address || {}
+        const ciudad = addr.city || addr.town || addr.village || addr.county || ''
+        const provincia = addr.state || ''
+        if (ciudad && provincia) return `${ciudad}, ${provincia}`
+        if (provincia) return provincia
+        return ''
+      } catch(e) { return '' }
+    }
+
+    async function seleccionarCampo(campo) {
+      campoActivo = campo
+      document.getElementById('modal-nuevo-campo').classList.add('hidden')
+      document.getElementById('estado-vacio').classList.add('hidden')
+      document.getElementById('vista-campo').classList.remove('hidden')
+      document.getElementById('campo-titulo').textContent = campo.nombre
+      renderSidebar()
+      cargarPronostico(campo.id)
+      cargarDolares()
+      cargarCanuelas()
+      const ubi = await obtenerUbicacion(campo.latitud, campo.longitud)
+      if (ubi) {
+        document.getElementById('campo-titulo').textContent = `${campo.nombre} — ${ubi}`
+      }
+    }
+
+    function abrirMargen(e) {
+      e.preventDefault()
+      if (!campoActivo) return
+      window.location.href = `margen.html?campo_id=${campoActivo.id}&nombre=${encodeURIComponent(campoActivo.nombre)}`
+    }
+
+    // ── Pronóstico ────────────────────────────────────────
+    async function cargarPronostico(campoId) {
+      document.getElementById('pronostico').innerHTML = `
+        <div class="col-span-5 flex gap-2">
+          ${[1,2,3,4,5].map(() => '<div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>').join('')}
+        </div>`
+      document.getElementById('alertas').innerHTML = '<p class="text-neutral-500 text-sm">Cargando...</p>'
+
+      const res = await fetch(`${API}/clima/pronostico/${campoId}?token=${token}`)
+      if (!res.ok) return
+      const { dias } = await res.json()
+
+      document.getElementById('pronostico').innerHTML = dias.map(dia => {
+        const d = new Date(dia.fecha + 'T12:00:00')
+        const fecha = `${DIAS_ES[d.getDay()]} ${d.getDate()} ${MESES_ES[d.getMonth()]}`
+        const c = COLORES[dia.estado]
+        return `
+          <div class="border estado-${dia.estado} rounded p-3 flex flex-col gap-2">
+            <p class="text-xs text-neutral-400 font-medium">${fecha}</p>
+            <div class="flex items-center gap-1">
+              <span class="${c.texto} text-xs">●</span>
+              <span class="${c.texto} text-xs font-semibold">${c.label}</span>
+            </div>
+            <p class="text-neutral-200 text-sm font-medium">${dia.temp_min}°/${dia.temp_max}°C</p>
+            <div class="flex flex-col gap-1.5 mt-1">
+              <div class="flex justify-between text-xs text-neutral-500"><span>Lluvia</span><span>${dia.prob_lluvia}%</span></div>
+              <div class="barra"><div class="barra-fill" style="width:${dia.prob_lluvia}%;background:${BARRA_LLUVIA(dia.prob_lluvia)}"></div></div>
+              <div class="flex justify-between text-xs text-neutral-500 mt-0.5"><span>Humedad</span><span>${dia.humedad}%</span></div>
+              <div class="barra"><div class="barra-fill" style="width:${dia.humedad}%;background:${BARRA_HUM(dia.humedad)}"></div></div>
+            </div>
+          </div>`
+      }).join('')
+
+      const problemas = dias.filter(d => d.estado !== 'ideal')
+      document.getElementById('alertas').innerHTML = !problemas.length
+        ? '<p class="text-green-400 text-sm">Sin alertas — toda la semana es ideal para corte.</p>'
+        : problemas.map(dia => {
+            const d = new Date(dia.fecha + 'T12:00:00')
+            const fecha = `${DIAS_ES[d.getDay()]} ${d.getDate()} ${MESES_ES[d.getMonth()]}`
+            const c = COLORES[dia.estado]
+            const razones = dia.razones.length ? dia.razones.join(' · ') : dia.etiqueta
+            return `
+              <div class="flex items-start gap-3 py-2.5 border-b border-neutral-800 last:border-0">
+                <span class="${c.texto} text-xs mt-0.5">●</span>
+                <div class="flex-1">
+                  <div class="flex items-center justify-between">
+                    <p class="text-sm text-neutral-200">${fecha}</p>
+                    <span class="${c.texto} text-xs">${c.label}</span>
+                  </div>
+                  <p class="text-xs text-neutral-500 mt-0.5">${razones}</p>
+                </div>
+              </div>`
+          }).join('')
+    }
+
+    // ── Nuevo campo ───────────────────────────────────────
+    document.getElementById('btn-nuevo-campo').addEventListener('click', () => {
+      document.getElementById('vista-campo').classList.add('hidden')
+      document.getElementById('estado-vacio').classList.add('hidden')
+      document.getElementById('modal-nuevo-campo').classList.remove('hidden')
+      if (!mapa) {
+        setTimeout(() => {
+          mapa = L.map('mapa').setView([-34, -64], 5)
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(mapa)
+          mapa.on('click', e => {
+            latLng = e.latlng
+            if (marcador) marcador.remove()
+            marcador = L.marker(latLng).addTo(mapa)
+            document.getElementById('coord-label').textContent = `Lat: ${latLng.lat.toFixed(5)}, Lon: ${latLng.lng.toFixed(5)}`
+          })
+        }, 100)
+      }
+    })
+
+    document.getElementById('btn-buscar').addEventListener('click', async () => {
+      const q = document.getElementById('buscar-lugar').value.trim()
+      if (!q) return
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`)
+      const data = await res.json()
+      if (!data.length) return alert('Lugar no encontrado')
+      latLng = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+      mapa.setView([latLng.lat, latLng.lng], 11)
+      if (marcador) marcador.remove()
+      marcador = L.marker([latLng.lat, latLng.lng]).addTo(mapa)
+      document.getElementById('coord-label').textContent = `Lat: ${latLng.lat.toFixed(5)}, Lon: ${latLng.lng.toFixed(5)}`
+    })
+
+    document.getElementById('buscar-lugar').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('btn-buscar').click()
+    })
+
+    document.getElementById('btn-guardar-campo').addEventListener('click', async () => {
+      if (!latLng) return alert('Seleccioná una ubicación en el mapa')
+      const nombre = document.getElementById('campo-nombre-input').value.trim()
+      if (!nombre) return alert('Ingresá el nombre del campo')
+
+      const res = await fetch(`${API}/campos?token=${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre, latitud: latLng.lat, longitud: latLng.lng }),
+      })
+      if (!res.ok) return alert('Error al guardar')
+      const nuevo = await res.json()
+      campos.push(nuevo)
+      document.getElementById('campo-nombre-input').value = ''
+      document.getElementById('coord-label').textContent = ''
+      latLng = null
+      if (marcador) { marcador.remove(); marcador = null }
+      seleccionarCampo(nuevo)
+    })
+
+    document.getElementById('btn-cancelar-campo').addEventListener('click', () => {
+      document.getElementById('modal-nuevo-campo').classList.add('hidden')
+      if (campoActivo) seleccionarCampo(campoActivo)
+      else mostrarVacio()
+    })
+
+    // ── Eliminar campo ────────────────────────────────────
+    document.getElementById('btn-eliminar-campo').addEventListener('click', async () => {
+      if (!confirm(`¿Eliminar el campo "${campoActivo.nombre}"?`)) return
+      await fetch(`${API}/campos/${campoActivo.id}?token=${token}`, { method: 'DELETE' })
+      campos = campos.filter(c => c.id !== campoActivo.id)
+      campoActivo = null
+      renderSidebar()
+      if (campos.length) seleccionarCampo(campos[0])
+      else mostrarVacio()
+    })
+
+    // ── Cotización dólar ──────────────────────────────────
+    const TTL_MS = 60 * 60 * 1000 // 60 minutos
+
+    async function cargarDolares() {
+      const tipos = [
+        { key: 'oficial',         label: 'Oficial' },
+        { key: 'blue',            label: 'Blue' },
+        { key: 'contadoconliqui', label: 'CCL' },
+      ]
+      const hoy = new Date().toISOString().slice(0, 10)
+      const cache = JSON.parse(localStorage.getItem('dolar_cache') || '{}')
+
+      // Usar caché si tiene menos de 60 minutos
+      if (cache._ts && (Date.now() - cache._ts) < TTL_MS && cache.oficial) {
+        renderDolares(tipos, [cache.oficial, cache.blue, cache.contadoconliqui], cache, hoy)
+        const d = new Date(cache._ts)
+        document.getElementById('dolar-actualizado').textContent =
+          `Actualizado ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} (caché)`
+        return
+      }
+
+      try {
+        const resultados = await Promise.all(
+          tipos.map(t => fetch(`https://dolarapi.com/v1/dolares/${t.key}`).then(r => r.json()))
+        )
+
+        renderDolares(tipos, resultados, cache, hoy)
+
+        const nuevo = { _ts: Date.now() }
+        resultados.forEach((d, i) => { nuevo[tipos[i].key] = { fecha: hoy, venta: d.venta, compra: d.compra } })
+        localStorage.setItem('dolar_cache', JSON.stringify(nuevo))
+
+        const ahora = new Date()
+        document.getElementById('dolar-actualizado').textContent =
+          `Actualizado ${ahora.getHours()}:${String(ahora.getMinutes()).padStart(2, '0')}`
+      } catch {
+        document.getElementById('dolar-cards').innerHTML =
+          '<p class="text-neutral-500 text-sm col-span-3">No se pudo cargar la cotización.</p>'
+      }
+    }
+
+    function renderDolares(tipos, resultados, cache, hoy) {
+      function variacion(key, ventaActual) {
+        const ayer = cache[key]
+        if (!ayer || ayer.fecha === hoy) return null
+        return ((ventaActual - ayer.venta) / ayer.venta) * 100
+      }
+      function badge(pct) {
+        if (pct === null) return '<span class="text-xs text-neutral-600">sin dato anterior</span>'
+        const color = pct > 0 ? 'text-red-400' : pct < 0 ? 'text-green-400' : 'text-neutral-500'
+        const flecha = pct > 0 ? '▲' : pct < 0 ? '▼' : '—'
+        return `<span class="${color} text-xs">${flecha} ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}% vs ayer</span>`
+      }
+      document.getElementById('dolar-cards').innerHTML = resultados.map((d, i) => `
+        <div class="border border-neutral-800 rounded p-4">
+          <p class="text-xs text-neutral-500 uppercase tracking-widest mb-3">${tipos[i].label}</p>
+          <div class="flex gap-4 mb-2">
+            <div>
+              <p class="text-xs text-neutral-600 mb-0.5">Compra</p>
+              <p class="text-base font-semibold text-neutral-100">$${d.compra.toLocaleString('es-AR')}</p>
+            </div>
+            <div>
+              <p class="text-xs text-neutral-600 mb-0.5">Venta</p>
+              <p class="text-base font-semibold text-accent">$${d.venta.toLocaleString('es-AR')}</p>
+            </div>
+          </div>
+          ${badge(variacion(tipos[i].key, d.venta))}
+        </div>`
+      ).join('')
+    }
+
+    // ── Mercado ganadero ─────────────────────────────────
+    let _mercadosData = []
+
+    function limpiarPrecio(str) {
+      return parseFloat((str || '0').replace(/\./g, '').replace(',', '.')) || 0
+    }
+    function badgeMercado(variacion) {
+      if (variacion > 0) return `<span class="text-green-400 text-xs">▲ +$${variacion.toLocaleString('es-AR')}</span>`
+      if (variacion < 0) return `<span class="text-red-400 text-xs">▼ $${variacion.toLocaleString('es-AR')}</span>`
+      return `<span class="text-neutral-600 text-xs">— sin cambio</span>`
+    }
+
+    function renderMercado(nombre) {
+      const mercado = _mercadosData.find(m => m.Mercado === nombre)
+      if (!mercado) return
+      const categorias = mercado.Categorias.filter(c => limpiarPrecio(c.PrecioMaximo) > 0)
+      document.getElementById('canuelas-cards').innerHTML = categorias.length
+        ? categorias.map(c => {
+            const min = limpiarPrecio(c.PrecioMinimo)
+            const max = limpiarPrecio(c.PrecioMaximo)
+            const vari = limpiarPrecio(c.Variacion)
+            return `
+              <div class="border border-neutral-800 rounded p-4">
+                <p class="text-xs text-neutral-500 mb-3 leading-snug">${c.Categoria}</p>
+                <div class="flex gap-3 mb-2">
+                  ${min > 0 ? `<div>
+                    <p class="text-xs text-neutral-600 mb-0.5">Mín.</p>
+                    <p class="text-sm font-semibold text-neutral-100">$${min.toLocaleString('es-AR')}</p>
+                  </div>` : ''}
+                  <div>
+                    <p class="text-xs text-neutral-600 mb-0.5">Máx.</p>
+                    <p class="text-sm font-semibold text-accent">$${max.toLocaleString('es-AR')}</p>
+                  </div>
+                </div>
+                ${badgeMercado(vari)}
+              </div>`
+          }).join('')
+        : '<p class="text-neutral-500 text-sm col-span-4">Sin operaciones registradas.</p>'
+
+      document.getElementById('canuelas-actualizado').textContent =
+        mercado.FechaActualizacion || ''
+    }
+
+    async function cargarCanuelas() {
+      const cacheGanado = JSON.parse(localStorage.getItem('ganado_cache') || '{}')
+
+      // Usar caché si tiene menos de 60 minutos
+      if (cacheGanado._ts && (Date.now() - cacheGanado._ts) < TTL_MS && cacheGanado.data) {
+        _mercadosData = cacheGanado.data
+        poblarSelectMercado()
+        document.getElementById('canuelas-actualizado').textContent += ' (caché)'
+        return
+      }
+
+      try {
+        const res = await fetch('https://api-cotizaciones.agrofy.com.ar/api/Prices/GetFarmPricesGordo', {
+          headers: { 'Referer': 'https://news.agrofy.com.ar/' }
+        })
+        _mercadosData = await res.json()
+        localStorage.setItem('ganado_cache', JSON.stringify({ _ts: Date.now(), data: _mercadosData }))
+        poblarSelectMercado()
+      } catch {
+        document.getElementById('canuelas-cards').innerHTML =
+          '<p class="text-neutral-500 text-sm col-span-4">No se pudo cargar el mercado ganadero.</p>'
+      }
+    }
+
+    function poblarSelectMercado() {
+      const select = document.getElementById('select-mercado')
+      select.innerHTML = _mercadosData.map(m =>
+        `<option value="${m.Mercado}">${m.Mercado}</option>`
+      ).join('')
+      const defaultMercado = _mercadosData.find(m => m.Mercado?.toLowerCase().includes('ñuelas'))
+      if (defaultMercado) select.value = defaultMercado.Mercado
+      renderMercado(select.value)
+    }
+
+    document.getElementById('logout').addEventListener('click', () => {
+      localStorage.removeItem('token')
+      window.location.href = 'login.html'
+    })
+  </script>
+</body>
+</html>

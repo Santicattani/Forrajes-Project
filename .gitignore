@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.env
+
+# Base de datos local
+*.db
+
+# OS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/

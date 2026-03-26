@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Iniciar sesión — Forrajes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: { accent: '#4a7c59' } } } }</script>
+</head>
+<body class="bg-neutral-950 text-neutral-100 min-h-screen font-mono flex flex-col">
+
+  <header class="border-b border-neutral-800 px-8 py-5 flex items-center justify-between">
+    <a href="index.html" class="text-accent font-semibold tracking-widest uppercase text-sm">Forrajes</a>
+    <nav class="flex gap-6 text-sm text-neutral-400">
+      <a href="register.html" class="hover:text-neutral-100 transition">Registrarse</a>
+    </nav>
+  </header>
+
+  <main class="flex-1 flex items-center justify-center px-4">
+    <div class="w-full max-w-sm">
+      <h1 class="text-2xl font-semibold mb-8 text-neutral-50 text-center">Iniciar sesión</h1>
+
+      <form id="form" class="flex flex-col gap-4">
+        <div>
+          <label class="text-xs text-neutral-400 uppercase tracking-wider block mb-1">Email</label>
+          <input id="email" type="email" required
+            class="w-full bg-neutral-900 border border-neutral-800 rounded px-4 py-2 text-sm focus:outline-none focus:border-accent" />
+        </div>
+        <div>
+          <label class="text-xs text-neutral-400 uppercase tracking-wider block mb-1">Contraseña</label>
+          <input id="password" type="password" required
+            class="w-full bg-neutral-900 border border-neutral-800 rounded px-4 py-2 text-sm focus:outline-none focus:border-accent" />
+        </div>
+
+        <p id="error" class="text-red-400 text-xs hidden"></p>
+
+        <button type="submit"
+          class="bg-accent hover:opacity-80 transition text-white text-sm px-6 py-3 rounded mt-2">
+          Entrar
+        </button>
+      </form>
+
+      <p class="text-center text-neutral-500 text-sm mt-6">
+        ¿No tenés cuenta? <a href="register.html" class="text-accent hover:underline">Registrate</a>
+      </p>
+    </div>
+  </main>
+
+  <script>
+    const API = 'http://localhost:8000/api/v1'
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const errorEl = document.getElementById('error')
+      errorEl.classList.add('hidden')
+
+      const res = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: document.getElementById('email').value,
+          password: document.getElementById('password').value,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        errorEl.textContent = data.detail || 'Credenciales incorrectas'
+        errorEl.classList.remove('hidden')
+        return
+      }
+
+      localStorage.setItem('token', data.access_token)
+      window.location.href = 'dashboard.html'
+    })
+  </script>
+</body>
+</html>
