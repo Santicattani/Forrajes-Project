@@ -9,7 +9,8 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    #mapa { height: 260px; }
+    #mapa { height: 220px; }
+    @media (min-width: 640px) { #mapa { height: 260px; } }
     .estado-ideal     { border-color: #4a7c59; background: rgba(74,124,89,0.06); }
     .estado-aceptable { border-color: #7c6e2a; background: rgba(124,110,42,0.06); }
     .estado-no_apto   { border-color: #7c3a3a; background: rgba(124,58,58,0.06); }
@@ -18,26 +19,49 @@
     .campo-item.activo { background: rgba(74,124,89,0.12); border-color: #4a7c59; color: #e5e5e5; }
     .tab-alfalfa.active-alfalfa { border-bottom-color: #4a7c59; color: #e5e5e5; }
     .tabla-alfalfa { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-    .tabla-alfalfa th { text-align: left; color: #737373; padding: 6px 8px; border-bottom: 1px solid #262626; }
-    .tabla-alfalfa td { padding: 6px 8px; border-bottom: 1px solid #1a1a1a; color: #d4d4d4; }
+    .tabla-alfalfa th { text-align: left; color: #737373; padding: 6px 8px; border-bottom: 1px solid #262626; white-space: nowrap; }
+    .tabla-alfalfa td { padding: 6px 8px; border-bottom: 1px solid #1a1a1a; color: #d4d4d4; white-space: nowrap; }
     .tabla-alfalfa tr:hover td { background: rgba(255,255,255,0.02); }
     .td-precio { color: #4a7c59; font-weight: 600; }
+    #sidebar { transition: transform 0.3s ease; }
   </style>
 </head>
 <body class="bg-neutral-950 text-neutral-100 min-h-screen font-mono flex flex-col">
 
-  <header class="border-b border-neutral-800 px-8 py-5 flex items-center justify-between">
-    <a href="dashboard.html" class="text-accent font-semibold tracking-widest uppercase text-sm">Forrajes</a>
-    <div class="flex items-center gap-6">
-      <span id="nombre-usuario" class="text-neutral-400 text-sm"></span>
-      <button id="logout" class="text-sm text-neutral-500 hover:text-neutral-100 transition">Cerrar sesión</button>
+  <!-- Header -->
+  <header class="border-b border-neutral-800 px-4 md:px-8 py-4 flex items-center justify-between shrink-0">
+    <div class="flex items-center gap-3">
+      <!-- Hamburger (solo mobile) -->
+      <button id="btn-sidebar-toggle" class="md:hidden text-neutral-400 hover:text-neutral-100 transition p-1 -ml-1" aria-label="Menú">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      <a href="dashboard.html" class="text-accent font-semibold tracking-widest uppercase text-sm">Forrajes</a>
+      <!-- Campo activo en mobile -->
+      <span id="campo-titulo-mobile" class="md:hidden text-neutral-500 text-xs truncate max-w-[140px]"></span>
+    </div>
+    <div class="flex items-center gap-4 md:gap-6">
+      <span id="nombre-usuario" class="hidden md:block text-neutral-400 text-sm"></span>
+      <button id="logout" class="text-sm text-neutral-500 hover:text-neutral-100 transition">Salir</button>
     </div>
   </header>
 
-  <div class="flex flex-1">
+  <!-- Overlay sidebar (mobile) -->
+  <div id="sidebar-overlay" class="hidden fixed inset-0 bg-black/60 z-30 md:hidden"></div>
 
-    <!-- Sidebar: mis campos -->
-    <aside class="w-56 border-r border-neutral-800 p-4 flex flex-col gap-2 shrink-0">
+  <div class="flex flex-1 min-h-0">
+
+    <!-- Sidebar -->
+    <aside id="sidebar"
+      class="fixed top-0 left-0 h-full z-40 w-64 bg-neutral-950 border-r border-neutral-800 p-4 flex flex-col gap-2 -translate-x-full
+             md:relative md:top-auto md:left-auto md:h-auto md:z-auto md:w-56 md:translate-x-0 md:shrink-0">
+      <!-- Botón cerrar (mobile) -->
+      <button id="btn-sidebar-close" class="md:hidden self-end text-neutral-500 hover:text-neutral-100 transition mb-2 p-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
       <p class="text-xs text-neutral-500 uppercase tracking-widest mb-2">Mis campos</p>
       <div id="lista-campos" class="flex flex-col gap-1"></div>
       <button id="btn-nuevo-campo"
@@ -47,7 +71,7 @@
     </aside>
 
     <!-- Contenido principal -->
-    <main class="flex-1 px-8 py-8 overflow-auto">
+    <main class="flex-1 px-4 md:px-8 py-6 md:py-8 overflow-auto">
 
       <!-- Estado vacío -->
       <div id="estado-vacio" class="hidden text-center py-24">
@@ -60,35 +84,37 @@
 
       <!-- Vista de campo seleccionado -->
       <div id="vista-campo" class="hidden">
-        <div class="flex items-center justify-between mb-6">
-          <div>
+        <div class="flex items-start justify-between mb-6 gap-3">
+          <div class="min-w-0">
             <p class="text-xs text-neutral-500 uppercase tracking-widest">Campo</p>
-            <h1 id="campo-titulo" class="text-2xl font-semibold text-neutral-50 mt-1"></h1>
+            <h1 id="campo-titulo" class="text-xl md:text-2xl font-semibold text-neutral-50 mt-1 leading-tight"></h1>
           </div>
           <button id="btn-eliminar-campo"
-            class="text-xs text-red-500 border border-red-900 px-3 py-1.5 rounded hover:bg-red-900/30 transition">
-            Eliminar campo
+            class="shrink-0 text-xs text-red-500 border border-red-900 px-3 py-1.5 rounded hover:bg-red-900/30 transition">
+            Eliminar
           </button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
           <!-- Días de corte -->
-          <div class="border border-neutral-800 rounded p-6 md:col-span-2">
+          <div class="border border-neutral-800 rounded p-4 md:p-6 md:col-span-2">
             <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Días ideales de corte</p>
-            <div id="pronostico" class="grid grid-cols-5 gap-2">
-              <div class="col-span-5 flex gap-2">
-                <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
-                <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
-                <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
-                <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
-                <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
+            <div class="overflow-x-auto -mx-1 px-1">
+              <div id="pronostico" class="grid grid-cols-5 gap-2" style="min-width:340px">
+                <div class="col-span-5 flex gap-2">
+                  <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
+                  <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
+                  <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
+                  <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
+                  <div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Margen operativo -->
-          <div class="border border-neutral-800 rounded p-6">
+          <div class="border border-neutral-800 rounded p-4 md:p-6">
             <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Margen operativo</p>
             <p class="text-neutral-400 text-xs leading-relaxed mb-4">Calculá costos por labor, compará con contratistas y analizá la rentabilidad de tu producción de heno.</p>
             <a id="link-margen" href="#" onclick="abrirMargen(event)" class="inline-block bg-accent hover:opacity-80 transition text-white text-xs px-4 py-2 rounded">
@@ -97,18 +123,18 @@
           </div>
 
           <!-- Alertas de clima -->
-          <div class="border border-neutral-800 rounded p-6 md:col-span-3">
+          <div class="border border-neutral-800 rounded p-4 md:p-6 md:col-span-3">
             <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Alertas de clima</p>
             <div id="alertas"><p class="text-neutral-500 text-sm">Cargando...</p></div>
           </div>
 
           <!-- Cotización del dólar -->
-          <div class="border border-neutral-800 rounded p-6 md:col-span-3">
+          <div class="border border-neutral-800 rounded p-4 md:p-6 md:col-span-3">
             <div class="flex items-center justify-between mb-4">
               <p class="text-xs text-neutral-500 uppercase tracking-widest">Cotización del dólar</p>
               <span id="dolar-actualizado" class="text-xs text-neutral-600"></span>
             </div>
-            <div id="dolar-cards" class="grid grid-cols-3 gap-4">
+            <div id="dolar-cards" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
               <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
               <div class="animate-pulse h-20 bg-neutral-900 rounded"></div>
@@ -116,7 +142,7 @@
           </div>
 
           <!-- Precios Alfalfa -->
-          <div class="border border-neutral-800 rounded p-6 md:col-span-3">
+          <div class="border border-neutral-800 rounded p-4 md:p-6 md:col-span-3">
             <div class="flex items-center justify-between mb-4">
               <div>
                 <p class="text-xs text-neutral-500 uppercase tracking-widest">Precios Alfalfa</p>
@@ -125,33 +151,35 @@
               <span id="alfalfa-actualizado" class="text-xs text-neutral-600"></span>
             </div>
             <!-- Tabs -->
-            <div class="flex gap-1 border-b border-neutral-800 mb-4">
+            <div class="flex gap-1 border-b border-neutral-800 mb-4 overflow-x-auto">
               <button onclick="mostrarTabAlfalfa('cordoba')" id="tab-alfalfa-cordoba"
-                class="tab-alfalfa px-4 py-2 text-xs text-neutral-400 border-b-2 border-transparent transition hover:text-neutral-200 active-alfalfa">
+                class="tab-alfalfa shrink-0 px-4 py-2 text-xs text-neutral-400 border-b-2 border-transparent transition hover:text-neutral-200 active-alfalfa">
                 Córdoba
               </button>
               <button onclick="mostrarTabAlfalfa('henificacion')" id="tab-alfalfa-henificacion"
-                class="tab-alfalfa px-4 py-2 text-xs text-neutral-400 border-b-2 border-transparent transition hover:text-neutral-200">
+                class="tab-alfalfa shrink-0 px-4 py-2 text-xs text-neutral-400 border-b-2 border-transparent transition hover:text-neutral-200">
                 Henificación
               </button>
               <button onclick="mostrarTabAlfalfa('otras')" id="tab-alfalfa-otras"
-                class="tab-alfalfa px-4 py-2 text-xs text-neutral-400 border-b-2 border-transparent transition hover:text-neutral-200">
+                class="tab-alfalfa shrink-0 px-4 py-2 text-xs text-neutral-400 border-b-2 border-transparent transition hover:text-neutral-200">
                 Otras Provincias
               </button>
             </div>
-            <div id="alfalfa-content">
-              <div class="animate-pulse h-32 bg-neutral-900 rounded"></div>
+            <div class="overflow-x-auto">
+              <div id="alfalfa-content">
+                <div class="animate-pulse h-32 bg-neutral-900 rounded"></div>
+              </div>
             </div>
           </div>
 
           <!-- Mercado de Cañuelas -->
-          <div class="border border-neutral-800 rounded p-6 md:col-span-3">
-            <div class="flex items-center justify-between mb-4">
-              <p class="text-xs text-neutral-500 uppercase tracking-widest">Mercado ganadero</p>
-              <div class="flex items-center gap-3">
-                <span id="canuelas-actualizado" class="text-xs text-neutral-600"></span>
+          <div class="border border-neutral-800 rounded p-4 md:p-6 md:col-span-3">
+            <div class="flex items-center justify-between mb-4 gap-3">
+              <p class="text-xs text-neutral-500 uppercase tracking-widest shrink-0">Mercado ganadero</p>
+              <div class="flex items-center gap-3 min-w-0">
+                <span id="canuelas-actualizado" class="text-xs text-neutral-600 hidden sm:block"></span>
                 <select id="select-mercado" onchange="renderMercado(this.value)"
-                  class="bg-neutral-900 border border-neutral-700 text-neutral-300 text-xs rounded px-2 py-1 focus:outline-none focus:border-accent">
+                  class="bg-neutral-900 border border-neutral-700 text-neutral-300 text-xs rounded px-2 py-1.5 focus:outline-none focus:border-accent min-w-0 max-w-[180px]">
                 </select>
               </div>
             </div>
@@ -166,30 +194,32 @@
         </div>
       </div>
 
-      <!-- Modal: nuevo campo -->
-      <div id="modal-nuevo-campo" class="hidden border border-neutral-800 rounded p-6 bg-neutral-900 max-w-xl">
-        <p class="text-sm font-semibold text-neutral-200 mb-4">Nuevo campo</p>
-        <p class="text-sm text-neutral-400 mb-4">Buscá o hacé click en el mapa para marcar la ubicación.</p>
-        <div class="flex gap-2 mb-4">
-          <input id="buscar-lugar" type="text" placeholder="Ej: Río Cuarto, Córdoba"
-            class="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent" />
-          <button id="btn-buscar" class="bg-neutral-700 hover:bg-neutral-600 text-sm px-4 py-2 rounded transition">Buscar</button>
-        </div>
-        <div id="mapa" class="rounded mb-4"></div>
-        <div class="flex gap-3 items-center">
-          <input id="campo-nombre-input" type="text" placeholder="Nombre del campo (ej: La Esperanza)"
-            class="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent" />
-          <button id="btn-guardar-campo" class="bg-accent hover:opacity-80 transition text-white text-sm px-5 py-2 rounded">
-            Guardar
-          </button>
-          <button id="btn-cancelar-campo" class="text-neutral-400 hover:text-neutral-100 text-sm px-3 py-2 transition">
-            Cancelar
-          </button>
-        </div>
-        <p id="coord-label" class="text-xs text-neutral-500 mt-2"></p>
-      </div>
-
     </main>
+  </div>
+
+  <!-- Modal: nuevo campo (overlay) -->
+  <div id="modal-nuevo-campo" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70">
+    <div class="bg-neutral-900 border border-neutral-800 rounded-t-xl sm:rounded-xl p-5 sm:p-6 w-full sm:max-w-xl max-h-[92vh] overflow-y-auto">
+      <p class="text-sm font-semibold text-neutral-200 mb-4">Nuevo campo</p>
+      <p class="text-sm text-neutral-400 mb-4">Buscá o hacé click en el mapa para marcar la ubicación.</p>
+      <div class="flex gap-2 mb-4">
+        <input id="buscar-lugar" type="text" placeholder="Ej: Río Cuarto, Córdoba"
+          class="flex-1 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent" />
+        <button id="btn-buscar" class="shrink-0 bg-neutral-700 hover:bg-neutral-600 text-sm px-4 py-2 rounded transition">Buscar</button>
+      </div>
+      <div id="mapa" class="rounded mb-4"></div>
+      <div class="flex gap-2 items-center flex-wrap">
+        <input id="campo-nombre-input" type="text" placeholder="Nombre del campo (ej: La Esperanza)"
+          class="flex-1 min-w-0 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-accent" />
+        <button id="btn-guardar-campo" class="shrink-0 bg-accent hover:opacity-80 transition text-white text-sm px-5 py-2 rounded">
+          Guardar
+        </button>
+        <button id="btn-cancelar-campo" class="shrink-0 text-neutral-400 hover:text-neutral-100 text-sm px-3 py-2 transition">
+          Cancelar
+        </button>
+      </div>
+      <p id="coord-label" class="text-xs text-neutral-500 mt-2"></p>
+    </div>
   </div>
 
   <script>
@@ -215,6 +245,27 @@
     const BARRA_LLUVIA = p => p < 20 ? '#4a7c59' : p < 40 ? '#a07c2a' : '#9b3030'
     const BARRA_HUM    = h => h < 65 ? '#4a7c59' : h < 75 ? '#a07c2a' : '#9b3030'
 
+    // ── Sidebar toggle (mobile) ───────────────────────────
+    const sidebar         = document.getElementById('sidebar')
+    const sidebarOverlay  = document.getElementById('sidebar-overlay')
+
+    function abrirSidebar() {
+      sidebar.classList.remove('-translate-x-full')
+      sidebar.classList.add('translate-x-0')
+      sidebarOverlay.classList.remove('hidden')
+      document.body.style.overflow = 'hidden'
+    }
+    function cerrarSidebar() {
+      sidebar.classList.add('-translate-x-full')
+      sidebar.classList.remove('translate-x-0')
+      sidebarOverlay.classList.add('hidden')
+      document.body.style.overflow = ''
+    }
+
+    document.getElementById('btn-sidebar-toggle').addEventListener('click', abrirSidebar)
+    document.getElementById('btn-sidebar-close').addEventListener('click', cerrarSidebar)
+    sidebarOverlay.addEventListener('click', cerrarSidebar)
+
     // ── Init ──────────────────────────────────────────────
     fetch(`${API}/auth/me?token=${token}`)
       .then(r => { if (!r.ok) throw new Error(); return r.json() })
@@ -234,7 +285,7 @@
 
     function renderSidebar() {
       document.getElementById('lista-campos').innerHTML = campos.map(c => `
-        <button onclick="seleccionarCampo(${JSON.stringify(c).replace(/"/g, '&quot;')})"
+        <button onclick="seleccionarCampo(${JSON.stringify(c).replace(/"/g, '&quot;')});cerrarSidebar()"
           class="campo-item text-left text-sm border border-neutral-800 rounded px-3 py-2 text-neutral-400 hover:text-neutral-100 hover:border-neutral-600 transition ${campoActivo?.id === c.id ? 'activo' : ''}">
           ${c.nombre}
         </button>`
@@ -267,6 +318,7 @@
       document.getElementById('estado-vacio').classList.add('hidden')
       document.getElementById('vista-campo').classList.remove('hidden')
       document.getElementById('campo-titulo').textContent = campo.nombre
+      document.getElementById('campo-titulo-mobile').textContent = campo.nombre
       renderSidebar()
       cargarPronostico(campo.id)
       cargarDolares()
@@ -275,6 +327,7 @@
       const ubi = await obtenerUbicacion(campo.latitud, campo.longitud)
       if (ubi) {
         document.getElementById('campo-titulo').textContent = `${campo.nombre} — ${ubi}`
+        document.getElementById('campo-titulo-mobile').textContent = campo.nombre
       }
     }
 
@@ -288,7 +341,7 @@
     async function cargarPronostico(campoId) {
       document.getElementById('pronostico').innerHTML = `
         <div class="col-span-5 flex gap-2">
-          ${[1,2,3,4,5].map(() => '<div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded"></div>').join('')}
+          ${[1,2,3,4,5].map(() => '<div class="animate-pulse h-28 flex-1 bg-neutral-900 rounded" style="min-width:64px"></div>').join('')}
         </div>`
       document.getElementById('alertas').innerHTML = '<p class="text-neutral-500 text-sm">Cargando...</p>'
 
@@ -341,6 +394,7 @@
 
     // ── Nuevo campo ───────────────────────────────────────
     document.getElementById('btn-nuevo-campo').addEventListener('click', () => {
+      cerrarSidebar()
       document.getElementById('vista-campo').classList.add('hidden')
       document.getElementById('estado-vacio').classList.add('hidden')
       document.getElementById('modal-nuevo-campo').classList.remove('hidden')
@@ -355,6 +409,8 @@
             document.getElementById('coord-label').textContent = `Lat: ${latLng.lat.toFixed(5)}, Lon: ${latLng.lng.toFixed(5)}`
           })
         }, 100)
+      } else {
+        setTimeout(() => mapa.invalidateSize(), 100)
       }
     })
 
@@ -392,6 +448,7 @@
       document.getElementById('coord-label').textContent = ''
       latLng = null
       if (marcador) { marcador.remove(); marcador = null }
+      document.getElementById('modal-nuevo-campo').classList.add('hidden')
       seleccionarCampo(nuevo)
     })
 
@@ -399,6 +456,13 @@
       document.getElementById('modal-nuevo-campo').classList.add('hidden')
       if (campoActivo) seleccionarCampo(campoActivo)
       else mostrarVacio()
+    })
+
+    // Cerrar modal con click en overlay
+    document.getElementById('modal-nuevo-campo').addEventListener('click', e => {
+      if (e.target === e.currentTarget) {
+        document.getElementById('btn-cancelar-campo').click()
+      }
     })
 
     // ── Eliminar campo ────────────────────────────────────
@@ -424,7 +488,6 @@
       const hoy = new Date().toISOString().slice(0, 10)
       const cache = JSON.parse(localStorage.getItem('dolar_cache') || '{}')
 
-      // Usar caché si tiene menos de 60 minutos
       if (cache._ts && (Date.now() - cache._ts) < TTL_MS && cache.oficial) {
         renderDolares(tipos, [cache.oficial, cache.blue, cache.contadoconliqui], cache, hoy)
         const d = new Date(cache._ts)
@@ -437,13 +500,10 @@
         const resultados = await Promise.all(
           tipos.map(t => fetch(`https://dolarapi.com/v1/dolares/${t.key}`).then(r => r.json()))
         )
-
         renderDolares(tipos, resultados, cache, hoy)
-
         const nuevo = { _ts: Date.now() }
         resultados.forEach((d, i) => { nuevo[tipos[i].key] = { fecha: hoy, venta: d.venta, compra: d.compra } })
         localStorage.setItem('dolar_cache', JSON.stringify(nuevo))
-
         const ahora = new Date()
         document.getElementById('dolar-actualizado').textContent =
           `Actualizado ${ahora.getHours()}:${String(ahora.getMinutes()).padStart(2, '0')}`
@@ -528,15 +588,12 @@
 
     async function cargarCanuelas() {
       const cacheGanado = JSON.parse(localStorage.getItem('ganado_cache') || '{}')
-
-      // Usar caché si tiene menos de 60 minutos
       if (cacheGanado._ts && (Date.now() - cacheGanado._ts) < TTL_MS && cacheGanado.data) {
         _mercadosData = cacheGanado.data
         poblarSelectMercado()
         document.getElementById('canuelas-actualizado').textContent += ' (caché)'
         return
       }
-
       try {
         const res = await fetch(`${API}/mercado/ganado`)
         _mercadosData = await res.json()

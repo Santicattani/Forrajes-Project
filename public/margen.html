@@ -28,22 +28,24 @@
 <body class="bg-neutral-950 text-neutral-100 min-h-screen font-mono text-sm">
 
 <!-- HEADER -->
-<header class="border-b border-neutral-800 px-6 py-4 flex items-center justify-between sticky top-0 bg-neutral-950 z-50">
-  <div class="flex items-center gap-4">
-    <a href="dashboard.html" class="text-neutral-500 hover:text-neutral-300 text-xs transition">← Dashboard</a>
-    <span class="text-neutral-700">|</span>
-    <span class="text-accent font-semibold tracking-widest uppercase text-xs">Forrajes</span>
-    <span class="text-neutral-700">|</span>
-    <span class="text-neutral-300 text-xs">Margen Operativo — Heno de Alfalfa</span>
-    <span id="header-campo-nombre" class="hidden text-neutral-500 text-xs">| <span id="header-campo-label"></span></span>
-  </div>
-  <div class="flex items-center gap-2">
-    <button onclick="abrirModalSims()" id="btn-sims" class="text-xs text-neutral-300 border border-neutral-600 px-3 py-1.5 rounded hover:border-accent hover:text-accent transition">
-      Simulaciones <span id="badge-sims-count" class="hidden ml-1 text-accent"></span>
-    </button>
-    <button onclick="resetearDefaults()" class="text-xs text-neutral-500 border border-neutral-700 px-3 py-1.5 rounded hover:border-neutral-500 hover:text-neutral-300 transition">
-      Restaurar defaults
-    </button>
+<header class="border-b border-neutral-800 px-4 md:px-6 py-3 md:py-4 sticky top-0 bg-neutral-950 z-50">
+  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+    <div class="flex items-center gap-2 md:gap-4 min-w-0">
+      <a href="dashboard.html" class="shrink-0 text-neutral-500 hover:text-neutral-300 text-xs transition">← Dashboard</a>
+      <span class="text-neutral-700 hidden md:inline">|</span>
+      <span class="text-accent font-semibold tracking-widest uppercase text-xs hidden md:inline">Forrajes</span>
+      <span class="text-neutral-700 hidden md:inline">|</span>
+      <span class="text-neutral-300 text-xs truncate">Margen Operativo — Heno de Alfalfa</span>
+      <span id="header-campo-nombre" class="hidden text-neutral-500 text-xs truncate">| <span id="header-campo-label"></span></span>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <button onclick="abrirModalSims()" id="btn-sims" class="text-xs text-neutral-300 border border-neutral-600 px-3 py-1.5 rounded hover:border-accent hover:text-accent transition">
+        Simulaciones <span id="badge-sims-count" class="hidden ml-1 text-accent"></span>
+      </button>
+      <button onclick="resetearDefaults()" class="text-xs text-neutral-500 border border-neutral-700 px-3 py-1.5 rounded hover:border-neutral-500 hover:text-neutral-300 transition">
+        <span class="hidden sm:inline">Restaurar </span>defaults
+      </button>
+    </div>
   </div>
 </header>
 
@@ -81,7 +83,7 @@
 </div>
 
 <!-- SECTION NAV -->
-<nav class="border-b border-neutral-800 px-6 flex gap-1 overflow-x-auto">
+<nav class="border-b border-neutral-800 px-4 md:px-6 flex gap-1 overflow-x-auto scrollbar-none">
   <button onclick="mostrarSeccion(0)" id="snav-0" class="sec-nav-btn border border-transparent px-4 py-3 text-xs text-neutral-500 rounded-t transition whitespace-nowrap active">0. Bienvenida</button>
   <button onclick="mostrarSeccion(1)" id="snav-1" class="sec-nav-btn border border-transparent px-4 py-3 text-xs text-neutral-500 rounded-t transition whitespace-nowrap">1. Datos Generales</button>
   <button onclick="mostrarSeccion(2)" id="snav-2" class="sec-nav-btn border border-transparent px-4 py-3 text-xs text-neutral-500 rounded-t transition whitespace-nowrap">2. Maquinaria</button>
@@ -90,7 +92,7 @@
   <button onclick="mostrarSeccion(5)" id="snav-5" class="sec-nav-btn border border-transparent px-4 py-3 text-xs text-neutral-500 rounded-t transition whitespace-nowrap">5. Nutricional</button>
 </nav>
 
-<main class="max-w-6xl mx-auto px-6 py-8">
+<main class="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8">
 
 <!-- ══════════════════════════════════════════════════════
      SECCIÓN 0 — BIENVENIDA
@@ -260,7 +262,7 @@
 
   <div id="labor-corte">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      <div class="border border-neutral-800 rounded p-4 md:col-span-2" id="tabla-costos-corte"></div>
+      <div class="border border-neutral-800 rounded p-4 md:col-span-2 overflow-x-auto" id="tabla-costos-corte"></div>
       <div class="border border-neutral-800 rounded p-4 flex flex-col">
         <p class="text-xs text-neutral-500 uppercase tracking-widest mb-3">Resumen</p>
         <div id="resumen-corte" class="space-y-2 flex-1"></div>
@@ -271,7 +273,7 @@
 
   <div id="labor-hilerado" class="hidden">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      <div class="border border-neutral-800 rounded p-4 md:col-span-2" id="tabla-costos-hilerado"></div>
+      <div class="border border-neutral-800 rounded p-4 md:col-span-2 overflow-x-auto" id="tabla-costos-hilerado"></div>
       <div class="border border-neutral-800 rounded p-4 flex flex-col">
         <p class="text-xs text-neutral-500 uppercase tracking-widest mb-3">Resumen</p>
         <div id="resumen-hilerado" class="space-y-2 flex-1"></div>
@@ -282,7 +284,7 @@
 
   <div id="labor-confeccion" class="hidden">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      <div class="border border-neutral-800 rounded p-4 md:col-span-2" id="tabla-costos-confeccion"></div>
+      <div class="border border-neutral-800 rounded p-4 md:col-span-2 overflow-x-auto" id="tabla-costos-confeccion"></div>
       <div class="border border-neutral-800 rounded p-4 flex flex-col">
         <p class="text-xs text-neutral-500 uppercase tracking-widest mb-3">Resumen</p>
         <div id="resumen-confeccion" class="space-y-2 flex-1"></div>
@@ -293,7 +295,7 @@
 
   <div id="labor-transporte" class="hidden">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      <div class="border border-neutral-800 rounded p-4 md:col-span-2" id="tabla-costos-transporte"></div>
+      <div class="border border-neutral-800 rounded p-4 md:col-span-2 overflow-x-auto" id="tabla-costos-transporte"></div>
       <div class="border border-neutral-800 rounded p-4 flex flex-col">
         <p class="text-xs text-neutral-500 uppercase tracking-widest mb-3">Resumen</p>
         <div id="resumen-transporte" class="space-y-2 flex-1"></div>
@@ -322,7 +324,7 @@
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
     <div class="border border-neutral-800 rounded p-5">
       <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Costo Total de Producción</p>
-      <div id="tabla-costo-total"></div>
+      <div id="tabla-costo-total" class="overflow-x-auto"></div>
     </div>
     <div class="border border-neutral-800 rounded p-5">
       <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Análisis de Margen</p>
@@ -369,7 +371,7 @@
     </div>
     <div class="border border-neutral-800 rounded p-5 md:col-span-2">
       <p class="text-xs text-accent uppercase tracking-widest mb-4">Calidad y Consumo Animal</p>
-      <div id="tabla-calidad"></div>
+      <div id="tabla-calidad" class="overflow-x-auto"></div>
     </div>
   </div>
 
@@ -377,11 +379,11 @@
     <div class="border border-neutral-800 rounded p-5">
       <p class="text-xs text-accent uppercase tracking-widest mb-4">Costo del Kg de Proteína Bruta</p>
       <p class="text-xs text-neutral-500 mb-3">Según % de PB (12% a 22%)</p>
-      <div id="tabla-costo-pb"></div>
+      <div id="tabla-costo-pb" class="overflow-x-auto"></div>
     </div>
     <div class="border border-neutral-800 rounded p-5">
       <p class="text-xs text-accent uppercase tracking-widest mb-4">Pastoreo Directo vs Henificado</p>
-      <div id="tabla-comparacion-pastoreo"></div>
+      <div id="tabla-comparacion-pastoreo" class="overflow-x-auto"></div>
     </div>
   </div>
 </section>
