@@ -8,6 +8,7 @@
   <script>tailwind.config = { theme: { extend: { colors: { accent: '#4a7c59' } } } }</script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     #mapa { height: 220px; }
     @media (min-width: 640px) { #mapa { height: 260px; } }
@@ -122,10 +123,64 @@
             </a>
           </div>
 
-          <!-- Alertas de clima -->
+          <!-- GDD Acumulado -->
           <div class="border border-neutral-800 rounded p-4 md:p-6 md:col-span-3">
-            <p class="text-xs text-neutral-500 uppercase tracking-widest mb-4">Alertas de clima</p>
-            <div id="alertas"><p class="text-neutral-500 text-sm">Cargando...</p></div>
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <p class="text-xs text-neutral-500 uppercase tracking-widest">Análisis de floración</p>
+              <div class="flex items-center gap-2">
+                <label for="gdd-fecha-corte" class="text-xs text-neutral-500 shrink-0">Último corte:</label>
+                <input type="date" id="gdd-fecha-corte"
+                  class="bg-neutral-900 border border-neutral-700 text-neutral-300 text-xs rounded px-2 py-1.5 focus:outline-none focus:border-accent" />
+                <button id="gdd-calcular"
+                  class="shrink-0 bg-accent hover:opacity-80 transition text-white text-xs px-3 py-1.5 rounded">
+                  Calcular
+                </button>
+              </div>
+            </div>
+
+            <div id="gdd-vacio" class="text-neutral-500 text-sm">
+              Ingresá la fecha del último corte para calcular los GDD acumulados.
+            </div>
+
+            <div id="gdd-cargando" class="hidden">
+              <p class="text-neutral-500 text-sm animate-pulse">Calculando GDD...</p>
+            </div>
+
+            <div id="gdd-error" class="hidden">
+              <p class="text-red-400 text-sm"></p>
+            </div>
+
+            <div id="gdd-cuerpo" class="hidden">
+              <!-- Banner alerta umbral -->
+              <div id="gdd-alerta" class="hidden mb-4 bg-amber-900/30 border border-amber-700 rounded px-4 py-3 flex items-start gap-3">
+                <span class="text-amber-400 text-base mt-0.5">⚑</span>
+                <div>
+                  <p class="text-amber-300 text-sm font-semibold">Se alcanzaron los 500 GDD — Momento óptimo de cosecha</p>
+                  <p id="gdd-alerta-fecha" class="text-amber-500 text-xs mt-0.5"></p>
+                </div>
+              </div>
+
+              <!-- Cards resumen -->
+              <div id="gdd-cards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5"></div>
+
+              <!-- Gráfico -->
+              <div class="mb-5 relative" style="max-height:260px">
+                <canvas id="gdd-chart"></canvas>
+              </div>
+
+              <!-- Tabla diaria -->
+              <div class="overflow-x-auto">
+                <table class="tabla-alfalfa w-full">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th><th>Tmax °C</th><th>Tmin °C</th><th>T prom</th>
+                      <th>GDD día</th><th>GDD acum.</th><th>Fuente</th>
+                    </tr>
+                  </thead>
+                  <tbody id="gdd-tabla-body"></tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
           <!-- Cotización del dólar -->
@@ -321,6 +376,7 @@
       document.getElementById('campo-titulo-mobile').textContent = campo.nombre
       renderSidebar()
       cargarPronostico(campo.id)
+      iniciarGDD(campo)
       cargarDolares()
       cargarCanuelas()
       cargarAlfalfa()
@@ -343,7 +399,6 @@
         [1,2,3,4,5].map(() =>
           '<div class="animate-pulse h-28 bg-neutral-900 rounded shrink-0 md:flex-1" style="min-width:48%;scroll-snap-align:start"></div>'
         ).join('')
-      document.getElementById('alertas').innerHTML = '<p class="text-neutral-500 text-sm">Cargando...</p>'
 
       const res = await fetch(`${API}/clima/pronostico/${campoId}?token=${token}`)
       if (!res.ok) return
@@ -369,27 +424,6 @@
             </div>
           </div>`
       }).join('')
-
-      const problemas = dias.filter(d => d.estado !== 'ideal')
-      document.getElementById('alertas').innerHTML = !problemas.length
-        ? '<p class="text-green-400 text-sm">Sin alertas — toda la semana es ideal para corte.</p>'
-        : problemas.map(dia => {
-            const d = new Date(dia.fecha + 'T12:00:00')
-            const fecha = `${DIAS_ES[d.getDay()]} ${d.getDate()} ${MESES_ES[d.getMonth()]}`
-            const c = COLORES[dia.estado]
-            const razones = dia.razones.length ? dia.razones.join(' · ') : dia.etiqueta
-            return `
-              <div class="flex items-start gap-3 py-2.5 border-b border-neutral-800 last:border-0">
-                <span class="${c.texto} text-xs mt-0.5">●</span>
-                <div class="flex-1">
-                  <div class="flex items-center justify-between">
-                    <p class="text-sm text-neutral-200">${fecha}</p>
-                    <span class="${c.texto} text-xs">${c.label}</span>
-                  </div>
-                  <p class="text-xs text-neutral-500 mt-0.5">${razones}</p>
-                </div>
-              </div>`
-          }).join('')
     }
 
     // ── Nuevo campo ───────────────────────────────────────
@@ -704,6 +738,311 @@
       localStorage.removeItem('token')
       window.location.href = 'login.html'
     })
+
+    // ══════════════════════════════════════════════════════════
+    // GDD — Grados Día de Desarrollo (Alfalfa)
+    // ══════════════════════════════════════════════════════════
+
+    // ── Configuración ──────────────────────────────────────────
+    const GDD_TB     = 5    // Temperatura base alfalfa (°C)
+    const GDD_UMBRAL = 500  // GDD acumulados para corte óptimo
+
+    let _gddChart = null
+
+    // ── Inicialización al seleccionar campo ────────────────────
+    function iniciarGDD(campo) {
+      const input = document.getElementById('gdd-fecha-corte')
+      if (!input.value) {
+        const d = new Date()
+        d.setDate(d.getDate() - 30)
+        input.value = d.toISOString().slice(0, 10)
+      }
+      calcularGDD(campo)
+    }
+
+    document.getElementById('gdd-calcular').addEventListener('click', () => {
+      if (campoActivo) calcularGDD(campoActivo)
+    })
+
+    // ── Fuente de datos climáticos ─────────────────────────────
+    // fetchClimateData combina automáticamente:
+    //   - Fechas pasadas → Meteostat  (GET /api/v1/historial/{id})
+    //   - Fechas futuras → Tomorrow.io (GET /api/v1/clima/pronostico/{id})
+    // Parámetros de la API (ajustar si cambia la estructura del backend):
+    const GDD_API = {
+      historial:   (id, desde, hasta) => `${API}/historial/${id}?token=${token}&fecha_inicio=${desde}&fecha_fin=${hasta}`,
+      pronostico:  (id)               => `${API}/clima/pronostico/${id}?token=${token}`,
+      // Campos devueltos por cada endpoint:
+      mapHistorial:   d => ({ fecha: d.fecha,    tmax: d.temp_max, tmin: d.temp_min }),
+      mapPronostico:  d => ({ fecha: d.fecha,    tmax: d.temp_max, tmin: d.temp_min }),
+    }
+
+    async function fetchClimateData(campoId, startDate, endDate) {
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+      const inicio = new Date(startDate + 'T00:00:00')
+      const fin    = new Date(endDate   + 'T00:00:00')
+      let resultado = []
+
+      // Histórico: desde inicio hasta ayer (inclusive)
+      if (inicio < hoy) {
+        const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1)
+        const finHist = fin < ayer ? fin : ayer
+        try {
+          const r = await fetch(GDD_API.historial(campoId, startDate, finHist.toISOString().slice(0, 10)))
+          if (r.ok) {
+            const data = await r.json()
+            resultado = data.dias
+              .filter(d => d.temp_max != null && d.temp_min != null)
+              .map(d => ({ ...GDD_API.mapHistorial(d), tipo: 'historico' }))
+          }
+        } catch (_) { /* continúa con pronóstico */ }
+      }
+
+      // Pronóstico: hoy en adelante (Tomorrow.io da 5 días)
+      if (fin >= hoy) {
+        try {
+          const r = await fetch(GDD_API.pronostico(campoId))
+          if (r.ok) {
+            const data = await r.json()
+            const pronostico = data.dias
+              .filter(d => {
+                const fd = new Date(d.fecha + 'T00:00:00')
+                return fd >= hoy && fd <= fin
+              })
+              .map(d => ({ ...GDD_API.mapPronostico(d), tipo: 'pronostico' }))
+            resultado = [...resultado, ...pronostico]
+          }
+        } catch (_) { /* continúa con lo que haya */ }
+      }
+
+      resultado.sort((a, b) => a.fecha.localeCompare(b.fecha))
+      return resultado
+    }
+
+    // ── Cálculo ────────────────────────────────────────────────
+    function gddDiario(tmax, tmin) {
+      return Math.max(0, (tmax + tmin) / 2 - GDD_TB)
+    }
+
+    async function calcularGDD(campo) {
+      const fechaCorte = document.getElementById('gdd-fecha-corte').value
+      if (!fechaCorte) return
+
+      document.getElementById('gdd-vacio').classList.add('hidden')
+      document.getElementById('gdd-cuerpo').classList.add('hidden')
+      document.getElementById('gdd-error').classList.add('hidden')
+      document.getElementById('gdd-cargando').classList.remove('hidden')
+
+      // Fin = hoy + 4 días (límite del pronóstico de 5 días)
+      const finDate = new Date()
+      finDate.setDate(finDate.getDate() + 4)
+      const fechaFin = finDate.toISOString().slice(0, 10)
+
+      let dias
+      try {
+        dias = await fetchClimateData(campo.id, fechaCorte, fechaFin)
+      } catch (e) {
+        document.getElementById('gdd-cargando').classList.add('hidden')
+        document.getElementById('gdd-error').classList.remove('hidden')
+        document.getElementById('gdd-error').querySelector('p').textContent =
+          'No se pudieron obtener los datos climáticos. Intentá de nuevo.'
+        return
+      }
+
+      document.getElementById('gdd-cargando').classList.add('hidden')
+
+      if (!dias.length) {
+        document.getElementById('gdd-error').classList.remove('hidden')
+        document.getElementById('gdd-error').querySelector('p').textContent =
+          'No hay datos disponibles para el período seleccionado.'
+        return
+      }
+
+      // Acumular GDD día a día
+      let acum = 0
+      let fechaUmbral = null
+      const filas = dias.map(d => {
+        const gdd = gddDiario(d.tmax, d.tmin)
+        acum += gdd
+        if (!fechaUmbral && acum >= GDD_UMBRAL) fechaUmbral = d.fecha
+        return { ...d, tprom: (d.tmax + d.tmin) / 2, gdd, acum }
+      })
+
+      document.getElementById('gdd-cuerpo').classList.remove('hidden')
+      renderGDDCards(filas, fechaUmbral)
+      renderGDDAlerta(fechaUmbral)
+      renderGDDChart(filas)
+      renderGDDTabla(filas, fechaUmbral)
+    }
+
+    // ── Render: cards ──────────────────────────────────────────
+    function renderGDDCards(filas, fechaUmbral) {
+      const total = filas[filas.length - 1]?.acum ?? 0
+      const gddPromDia = filas.length > 0 ? total / filas.length : 0
+      const gddRestante = Math.max(0, GDD_UMBRAL - total)
+      const colorGDD = total >= GDD_UMBRAL ? 'text-amber-400' : 'text-accent'
+
+      let diasRest = '—', fechaProy = '—'
+      if (fechaUmbral) {
+        fechaProy = gddFormatFecha(fechaUmbral)
+      } else if (gddPromDia > 0) {
+        const n = Math.ceil(gddRestante / gddPromDia)
+        diasRest = `~${n} días`
+        const fp = new Date(); fp.setDate(fp.getDate() + n)
+        fechaProy = fp.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+      }
+
+      document.getElementById('gdd-cards').innerHTML = `
+        <div class="border border-neutral-800 rounded p-3">
+          <p class="text-xs text-neutral-500 mb-1">GDD acumulado</p>
+          <p class="text-xl font-semibold ${colorGDD}">${Math.round(total)}</p>
+          <p class="text-xs text-neutral-600">de ${GDD_UMBRAL} objetivo</p>
+        </div>
+        <div class="border border-neutral-800 rounded p-3">
+          <p class="text-xs text-neutral-500 mb-1">Días analizados</p>
+          <p class="text-xl font-semibold text-neutral-100">${filas.length}</p>
+          <p class="text-xs text-neutral-600">desde el último corte</p>
+        </div>
+        <div class="border border-neutral-800 rounded p-3">
+          <p class="text-xs text-neutral-500 mb-1">Días para 500 GDD</p>
+          <p class="text-xl font-semibold text-neutral-100">${diasRest}</p>
+          <p class="text-xs text-neutral-600">${fechaUmbral ? 'umbral ya alcanzado' : 'estimado por promedio'}</p>
+        </div>
+        <div class="border border-neutral-800 rounded p-3">
+          <p class="text-xs text-neutral-500 mb-1">Fecha de corte</p>
+          <p class="text-xl font-semibold text-neutral-100">${fechaProy}</p>
+          <p class="text-xs text-neutral-600">${fechaUmbral ? 'real' : 'proyectada'}</p>
+        </div>`
+    }
+
+    // ── Render: banner alerta ──────────────────────────────────
+    function renderGDDAlerta(fechaUmbral) {
+      const el = document.getElementById('gdd-alerta')
+      if (fechaUmbral) {
+        el.classList.remove('hidden')
+        document.getElementById('gdd-alerta-fecha').textContent =
+          `Umbral alcanzado el ${gddFormatFecha(fechaUmbral)}`
+      } else {
+        el.classList.add('hidden')
+      }
+    }
+
+    // ── Render: gráfico Chart.js ───────────────────────────────
+    function renderGDDChart(filas) {
+      if (_gddChart) { _gddChart.destroy(); _gddChart = null }
+
+      const labels = filas.map(f => f.fecha.slice(5))
+
+      // Separar datasets histórico / pronóstico
+      const dataHist = filas.map(f => f.tipo === 'historico' ? f.acum : null)
+      const dataPron = filas.map(f => f.tipo === 'pronostico' ? f.acum : null)
+
+      // Conectar el punto de transición entre histórico y pronóstico
+      const lastHistIdx = filas.map(f => f.tipo).lastIndexOf('historico')
+      if (lastHistIdx >= 0 && lastHistIdx + 1 < filas.length && filas[lastHistIdx + 1].tipo === 'pronostico') {
+        dataPron[lastHistIdx] = filas[lastHistIdx].acum
+      }
+
+      const umbralLine = filas.map(() => GDD_UMBRAL)
+
+      _gddChart = new Chart(document.getElementById('gdd-chart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Floración GDD (histórico)',
+              data: dataHist,
+              borderColor: '#4a7c59',
+              backgroundColor: 'rgba(74,124,89,0.10)',
+              borderWidth: 2,
+              pointRadius: 2,
+              fill: true,
+              spanGaps: false,
+              tension: 0.3,
+            },
+            {
+              label: 'Floración GDD (pronóstico)',
+              data: dataPron,
+              borderColor: '#d97706',
+              backgroundColor: 'rgba(217,119,6,0.08)',
+              borderWidth: 2,
+              borderDash: [5, 4],
+              pointRadius: 2,
+              fill: true,
+              spanGaps: false,
+              tension: 0.3,
+            },
+            {
+              label: 'Umbral de corte (500)',
+              data: umbralLine,
+              borderColor: '#ef4444',
+              borderWidth: 1.5,
+              borderDash: [6, 3],
+              pointRadius: 0,
+              fill: false,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              labels: { color: '#a3a3a3', font: { family: 'monospace', size: 11 }, boxWidth: 20 },
+            },
+            tooltip: {
+              backgroundColor: '#171717',
+              borderColor: '#404040',
+              borderWidth: 1,
+              titleColor: '#e5e5e5',
+              bodyColor: '#a3a3a3',
+            },
+          },
+          scales: {
+            x: {
+              ticks: { color: '#737373', font: { family: 'monospace', size: 10 }, maxTicksLimit: 12 },
+              grid: { color: '#1a1a1a' },
+            },
+            y: {
+              ticks: { color: '#737373', font: { family: 'monospace', size: 10 } },
+              grid: { color: '#1a1a1a' },
+              title: { display: true, text: 'GDD Acumulado', color: '#525252', font: { family: 'monospace', size: 10 } },
+            },
+          },
+        },
+      })
+    }
+
+    // ── Render: tabla diaria ───────────────────────────────────
+    function renderGDDTabla(filas, fechaUmbral) {
+      document.getElementById('gdd-tabla-body').innerHTML = filas.map(f => {
+        const esUmbral = f.fecha === fechaUmbral
+        const esFrio   = f.gdd === 0
+        const rowClass = esUmbral ? 'bg-amber-900/20' : esFrio ? 'opacity-40' : ''
+        const acumStyle = f.acum >= GDD_UMBRAL ? 'color:#d97706;font-weight:600' : ''
+        const tipoLabel = f.tipo === 'historico'
+          ? '<span class="text-neutral-500">Histórico</span>'
+          : '<span class="text-amber-600">Pronóstico</span>'
+        const marker = esUmbral ? ' <span class="text-amber-400 font-semibold">← 500</span>' : ''
+        return `<tr class="${rowClass}">
+          <td>${gddFormatFecha(f.fecha)}</td>
+          <td>${f.tmax?.toFixed(1) ?? '—'}°</td>
+          <td>${f.tmin?.toFixed(1) ?? '—'}°</td>
+          <td>${f.tprom?.toFixed(1) ?? '—'}°</td>
+          <td>${f.gdd?.toFixed(1) ?? '—'}</td>
+          <td style="${acumStyle}">${Math.round(f.acum)}</td>
+          <td>${tipoLabel}${marker}</td>
+        </tr>`
+      }).join('')
+    }
+
+    // ── Utilidad ───────────────────────────────────────────────
+    function gddFormatFecha(iso) {
+      const d = new Date(iso + 'T12:00:00')
+      return `${d.getDate()} ${MESES_ES[d.getMonth()]} ${d.getFullYear()}`
+    }
   </script>
 </body>
 </html>
