@@ -821,7 +821,7 @@
 
     // ── Cálculo ────────────────────────────────────────────────
     function gddDiario(tmax, tmin) {
-      return Math.max(0, (tmax + tmin) / 2 - GDD_TB)
+      return Math.max(0, (tmax + tmin / 2) - GDD_TB)
     }
 
     async function calcularGDD(campo) {
@@ -865,7 +865,7 @@
         const gdd = gddDiario(d.tmax, d.tmin)
         acum += gdd
         if (!fechaUmbral && acum >= GDD_UMBRAL) fechaUmbral = d.fecha
-        return { ...d, tprom: (d.tmax + d.tmin) / 2, gdd, acum }
+        return { ...d, tprom: d.tmax + d.tmin / 2, gdd, acum }
       })
 
       document.getElementById('gdd-cuerpo').classList.remove('hidden')
